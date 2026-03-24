@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function proxy(req: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request: req })
+  const res = NextResponse.next()
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,30 +14,30 @@ export async function proxy(req: NextRequest) {
           return req.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({ request: req })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
+          cookiesToSet.forEach(({ name, value, options }) => {
+            req.cookies.set(name, value)
+            res.cookies.set(name, value, options)
+          })
         },
       },
     }
   )
 
-  const { data: { session } } = await supabase.auth.getSession()
+  // Refresh session — this keeps the session alive across requests
+  const { data: { user } } = await supabase.auth.getUser()
 
   const { pathname } = req.nextUrl
   const protectedPaths = ['/dashboard', '/create']
 
   if (protectedPaths.some(p => pathname.startsWith(p))) {
-    if (!session) {
+    if (!user) {
       return NextResponse.redirect(new URL('/login', req.url))
     }
   }
 
-  return supabaseResponse
+  return res
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/create/:path*', '/((?!auth|_next/static|_next/image|favicon.ico).*)']
+  matcher: ['/dashboard/:path*', '/create/:path*']
 }
