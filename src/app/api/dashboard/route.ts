@@ -1,9 +1,8 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
 
 export async function GET() {
-  const supabase = createRouteHandlerClient({ cookies })
+  const supabase = await createSupabaseServerClient()
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -55,7 +54,7 @@ export async function GET() {
     const score = openPoints + timePoints + clickPoints + returnPoints
 
     // Last visit
-    const sortedVisits = [...visits].sort((a: { created_at: string }, b: { created_at: string }) => 
+    const sortedVisits = [...visits].sort((a: { created_at: string }, b: { created_at: string }) =>
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     )
     const lastVisit = sortedVisits[0]?.created_at || null
