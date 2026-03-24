@@ -17,7 +17,7 @@ export default function LoginPage() {
     const { error } = await supabaseBrowser.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+        emailRedirectTo: `https://kuevo.io/auth/callback?next=/dashboard`,
       },
     })
 

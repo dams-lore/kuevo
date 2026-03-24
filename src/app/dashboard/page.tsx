@@ -35,12 +35,12 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { session } } = await supabaseBrowser.auth.getSession()
-      if (!session) {
+      const { data: { user: authUser } } = await supabaseBrowser.auth.getUser()
+      if (!authUser) {
         router.push('/login')
         return
       }
-      setUser(session.user)
+      setUser(authUser)
 
       const res = await fetch('/api/dashboard')
       const data = await res.json()
