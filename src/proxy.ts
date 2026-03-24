@@ -39,5 +39,5 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/create/:path*']
+  matcher: ['/dashboard/:path*', '/create/:path*', '/((?!auth|_next/static|_next/image|favicon.ico).*)']
 }
