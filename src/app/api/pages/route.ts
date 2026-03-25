@@ -7,12 +7,12 @@ export async function POST(req: Request) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { prospect_name, company, intro_message, blocks } = await req.json()
+  const { prospect_name, company, prospect_email, intro_message, blocks } = await req.json()
   const slug = nanoid(10)
 
   const { data: page, error: pageError } = await supabase
     .from('pages')
-    .insert({ user_id: session.user.id, slug, prospect_name, company, intro_message })
+    .insert({ user_id: session.user.id, slug, prospect_name, company, prospect_email: prospect_email || null, intro_message })
     .select()
     .single()
 

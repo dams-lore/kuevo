@@ -16,6 +16,7 @@ interface Integration {
 export default function CreatePage() {
   const [prospectName, setProspectName] = useState('')
   const [company, setCompany] = useState('')
+  const [prospectEmail, setProspectEmail] = useState('')
   const [introMessage, setIntroMessage] = useState('')
   const [blocks, setBlocks] = useState<Block[]>([{ title: '', url: '' }])
   const [loading, setLoading] = useState(false)
@@ -26,6 +27,15 @@ export default function CreatePage() {
   const [copied, setCopied] = useState(false)
   const [integration, setIntegration] = useState<Integration | null>(null)
   const [checkingIntegration, setCheckingIntegration] = useState(true)
+
+  // Email modal state
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [emailTo, setEmailTo] = useState('')
+  const [emailSubject, setEmailSubject] = useState('')
+  const [emailBody, setEmailBody] = useState('')
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [emailSent, setEmailSent] = useState(false)
+  const [emailError, setEmailError] = useState('')
 
   useEffect(() => {
     async function checkIntegration() {
@@ -131,6 +141,7 @@ export default function CreatePage() {
         body: JSON.stringify({
           prospect_name: prospectName,
           company,
+          prospect_email: prospectEmail,
           intro_message: introMessage,
           blocks: validBlocks,
         }),
@@ -138,6 +149,14 @@ export default function CreatePage() {
       const data = await res.json()
       if (data.url) {
         setResult(data)
+        setEmailTo(prospectEmail)
+        setEmailSubject(`Resources for ${prospectName} at ${company}`)
+        setEmailBody(
+          `Hi ${prospectName},\n\n` +
+          (introMessage ? introMessage + '\n\n' : '') +
+          `I've put together a page with the resources we discussed:\n${data.url}\n\n` +
+          `Let me know if you have any questions!\n\nBest,`
+        )
       } else {
         setError(data.error || 'Failed to create page')
       }
@@ -153,6 +172,34 @@ export default function CreatePage() {
       await navigator.clipboard.writeText(result.url)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  async function sendEmail() {
+    setSendingEmail(true)
+    setEmailError('')
+    try {
+      const res = await fetch('/api/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: emailTo, subject: emailSubject, body: emailBody }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setEmailSent(true)
+        setTimeout(() => setShowEmailModal(false), 2000)
+      } else if (data.error === 'Gmail not connected') {
+        // Fallback to mailto
+        const mailtoUrl = `mailto:${encodeURIComponent(emailTo)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`
+        window.open(mailtoUrl, '_blank')
+        setShowEmailModal(false)
+      } else {
+        setEmailError(data.error || 'Failed to send email')
+      }
+    } catch {
+      setEmailError('Network error')
+    } finally {
+      setSendingEmail(false)
     }
   }
 
@@ -181,13 +228,108 @@ export default function CreatePage() {
             </button>
 
             <button
-              onClick={() => { setResult(null); setProspectName(''); setCompany(''); setIntroMessage(''); setBlocks([{ title: '', url: '' }]) }}
+              onClick={() => setShowEmailModal(true)}
+              className="w-full py-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium rounded-xl transition flex items-center justify-center gap-2 mb-3"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              Send email
+            </button>
+
+            <button
+              onClick={() => { setResult(null); setProspectName(''); setCompany(''); setProspectEmail(''); setIntroMessage(''); setBlocks([{ title: '', url: '' }]); setEmailSent(false) }}
               className="w-full py-3 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 font-medium rounded-lg transition"
             >
               Create another
             </button>
           </div>
         </div>
+
+        {showEmailModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-lg font-semibold text-gray-900">Send email</h3>
+                <button onClick={() => setShowEmailModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+              </div>
+
+              {emailSent ? (
+                <div className="text-center py-6">
+                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <p className="text-gray-900 font-semibold">Email sent ✓</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
+                    <input
+                      type="email"
+                      value={emailTo}
+                      onChange={e => setEmailTo(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                    <input
+                      type="text"
+                      value={emailSubject}
+                      onChange={e => setEmailSubject(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                    <textarea
+                      value={emailBody}
+                      onChange={e => setEmailBody(e.target.value)}
+                      rows={8}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+                    />
+                  </div>
+
+                  {emailError && <p className="text-red-500 text-sm">{emailError}</p>}
+
+                  <div className="flex gap-3 pt-1">
+                    <button
+                      onClick={() => setShowEmailModal(false)}
+                      className="flex-1 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition text-sm"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={sendEmail}
+                      disabled={sendingEmail || !emailTo}
+                      className="flex-1 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 disabled:opacity-50 text-white font-medium rounded-lg transition text-sm flex items-center justify-center gap-2"
+                    >
+                      {sendingEmail ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                          </svg>
+                          Send via Gmail
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  {!integration && (
+                    <p className="text-xs text-gray-400 text-center">Gmail not connected — will open in your mail client instead</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -269,6 +411,19 @@ export default function CreatePage() {
                   className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Prospect email <span className="text-gray-400 font-normal">(optional — for sending)</span>
+              </label>
+              <input
+                type="email"
+                value={prospectEmail}
+                onChange={(e) => setProspectEmail(e.target.value)}
+                placeholder="sarah@acmecorp.com"
+                className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition text-sm"
+              />
             </div>
 
             <div>
