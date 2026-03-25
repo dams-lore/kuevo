@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 
+// Must match exactly what's registered in Google Cloud Console
+const REDIRECT_URI = 'https://kuevo.io/api/auth/google/callback'
+
 export async function GET(req: Request) {
   const url = new URL(req.url)
   const code = url.searchParams.get('code')
@@ -18,7 +21,7 @@ export async function GET(req: Request) {
       code,
       client_id: process.env.GOOGLE_CLIENT_ID!,
       client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      redirect_uri: process.env.GOOGLE_REDIRECT_URI!,
+      redirect_uri: REDIRECT_URI,
       grant_type: 'authorization_code',
     }),
   })

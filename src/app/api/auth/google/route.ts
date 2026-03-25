@@ -1,20 +1,24 @@
 import { NextResponse } from 'next/server'
 
+// The redirect URI MUST match exactly what's in Google Cloud Console:
+// https://kuevo.io/api/auth/google/callback
+const REDIRECT_URI = 'https://kuevo.io/api/auth/google/callback'
+
 export async function GET() {
   const clientId = process.env.GOOGLE_CLIENT_ID
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI ?? 'https://kuevo.io/api/auth/google/callback'
 
-  console.log('[google/oauth] client_id present:', !!clientId)
-  console.log('[google/oauth] redirect_uri:', redirectUri)
+  console.log('[gmail-oauth] GOOGLE_CLIENT_ID present:', !!clientId)
+  console.log('[gmail-oauth] GOOGLE_CLIENT_SECRET present:', !!process.env.GOOGLE_CLIENT_SECRET)
+  console.log('[gmail-oauth] redirect_uri:', REDIRECT_URI)
 
-  if (!clientId) {
-    console.error('[google/oauth] GOOGLE_CLIENT_ID is not set')
+  if (!clientId || clientId === 'placeholder') {
+    console.error('[gmail-oauth] GOOGLE_CLIENT_ID not configured')
     return NextResponse.redirect('https://kuevo.io/create?error=google_not_configured')
   }
 
   const params = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: redirectUri,
+    redirect_uri: REDIRECT_URI,
     response_type: 'code',
     scope: [
       'https://www.googleapis.com/auth/gmail.readonly',
@@ -26,8 +30,5 @@ export async function GET() {
     prompt: 'consent',
   })
 
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`
-  console.log('[google/oauth] redirecting to:', authUrl)
-
-  return NextResponse.redirect(authUrl)
+  return NextResponse.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`)
 }
