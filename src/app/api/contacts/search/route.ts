@@ -56,8 +56,16 @@ export async function GET(req: Request) {
       sortOrder: 'FIRST_NAME_ASCENDING',
     })
 
-    console.log('[contacts/search] connections API results:', res.data.connections?.length || 0, 'contacts')
-    for (const person of res.data.connections || []) {
+    const connectionsData = res.data.connections
+    console.log('[contacts/search] connections API results:', connectionsData?.length || 0, 'contacts')
+    console.log('[contacts/search] raw response:', JSON.stringify(res.data, null, 2).substring(0, 500))
+    
+    if (!connectionsData || connectionsData.length === 0) {
+      console.log('[contacts/search] WARNING: No connections found. User may not have any Google Contacts.')
+      return NextResponse.json({ contacts: [], warning: 'No contacts found in Google Contacts' })
+    }
+
+    for (const person of connectionsData) {
       const name = person.names?.[0]?.displayName || ''
       const email = person.emailAddresses?.[0]?.value || ''
       let company = person.organizations?.[0]?.name || ''
@@ -85,6 +93,8 @@ export async function GET(req: Request) {
     }
   } catch (e) {
     console.error('[contacts/search] people API error:', e instanceof Error ? e.message : String(e))
+    console.error('[contacts/search] full error:', e)
+    return NextResponse.json({ contacts: [], error: e instanceof Error ? e.message : String(e) }, { status: 500 })
   }
 
   // TODO: Email-based contact extraction disabled for now
