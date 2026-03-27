@@ -309,9 +309,9 @@ export default function CreatePage() {
           <p className="text-gray-500 text-sm">Share personalized resources with your prospect</p>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-sm space-y-8">
+        <div className="space-y-4">
           {/* Section 1: Contact */}
-          <section>
+          <section className="bg-gradient-to-br from-violet-50 to-indigo-50 rounded-3xl p-8 border border-violet-100/50">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-violet-100 text-violet-700 text-sm font-bold mr-3">①</span>
               Contact
@@ -387,11 +387,8 @@ export default function CreatePage() {
             </div>
           </section>
 
-          {/* Divider */}
-          <div className="border-t border-gray-200"></div>
-
           {/* Section 2: Intro Message */}
-          <section>
+          <section className="bg-gradient-to-br from-violet-50 to-indigo-50 rounded-3xl p-8 border border-violet-100/50">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-violet-100 text-violet-700 text-sm font-bold mr-3">②</span>
               Intro message
@@ -418,11 +415,8 @@ export default function CreatePage() {
             </div>
           </section>
 
-          {/* Divider */}
-          <div className="border-t border-gray-200"></div>
-
           {/* Section 3: Content */}
-          <section>
+          <section className="bg-gradient-to-br from-violet-50 to-indigo-50 rounded-3xl p-8 border border-violet-100/50">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-violet-100 text-violet-700 text-sm font-bold mr-3">③</span>
               Content
@@ -501,11 +495,8 @@ export default function CreatePage() {
             </div>
           </section>
 
-          {/* Divider */}
-          <div className="border-t border-gray-200"></div>
-
           {/* Section 4: Send */}
-          <section>
+          <section className="bg-gradient-to-br from-violet-50 to-indigo-50 rounded-3xl p-8 border border-violet-100/50">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-violet-100 text-violet-700 text-sm font-bold mr-3">④</span>
               Send
