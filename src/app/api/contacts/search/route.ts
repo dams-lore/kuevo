@@ -38,71 +38,102 @@ export async function GET(req: Request) {
     name: string
     email: string
     company: string
-    source: 'google'
+    source: 'gmail'
   }
 
   const contacts: Contact[] = []
-
-  const peopleApi = google.people({ version: 'v1', auth: oauth2Client })
   const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
 
   try {
-    // Fetch Google Contacts
-    console.log('[contacts/search] fetching connections with query:', query)
-    const res = await peopleApi.people.connections.list({
-      resourceName: 'people/me',
-      pageSize: 100,
-      personFields: 'names,emailAddresses,organizations',
-      sortOrder: 'FIRST_NAME_ASCENDING',
+    console.log('[contacts/search] searching Gmail for:', query)
+    
+    // Search Gmail for emails from/to this name or email
+    const gmailQuery = `from:${query} OR to:${query}`
+    const listRes = await gmail.users.messages.list({
+      userId: 'me',
+      q: gmailQuery,
+      maxResults: 50,
     })
 
-    const connectionsData = res.data.connections
-    console.log('[contacts/search] connections API results:', connectionsData?.length || 0, 'contacts')
-    console.log('[contacts/search] raw response:', JSON.stringify(res.data, null, 2).substring(0, 500))
-    
-    if (!connectionsData || connectionsData.length === 0) {
-      console.log('[contacts/search] WARNING: No connections found. User may not have any Google Contacts.')
-      return NextResponse.json({ contacts: [], warning: 'No contacts found in Google Contacts' })
+    const messages = listRes.data.messages || []
+    console.log('[contacts/search] found', messages.length, 'Gmail messages')
+
+    const contactMap = new Map<string, { name: string; email: string }>()
+
+    // Extract sender/recipient info from each message
+    for (const msg of messages.slice(0, 30)) {
+      try {
+        const full = await gmail.users.messages.get({
+          userId: 'me',
+          id: msg.id!,
+          format: 'metadata',
+          metadataHeaders: ['From', 'To'],
+        })
+
+        const headers = full.data.payload?.headers || []
+        const fromHeader = headers.find(h => h.name === 'From')?.value || ''
+        const toHeader = headers.find(h => h.name === 'To')?.value || ''
+
+        // Parse email headers to extract name and email
+        const parseEmail = (header: string) => {
+          // Match: "Name" <email@domain.com> or Name <email@domain.com> or just email@domain.com
+          const match = header.match(/^"?([^"<]+)"?\s*<([^>]+)>|^([a-z0-9._%+-]+@[a-z0-9.-]+)/i)
+          if (match) {
+            let name = (match[1] || match[3] || '').trim().replace(/^["']|["']$/g, '')
+            let email = match[2] || match[3]
+            return name && email ? { name, email } : null
+          }
+          return null
+        }
+
+        const fromParsed = parseEmail(fromHeader)
+        const toParsed = parseEmail(toHeader)
+
+        // Add to map if not already there
+        if (fromParsed && !contactMap.has(fromParsed.email.toLowerCase())) {
+          contactMap.set(fromParsed.email.toLowerCase(), fromParsed)
+        }
+        if (toParsed && !contactMap.has(toParsed.email.toLowerCase())) {
+          contactMap.set(toParsed.email.toLowerCase(), toParsed)
+        }
+      } catch (e) {
+        console.error('[contacts/search] error parsing message:', e)
+      }
     }
 
-    for (const person of connectionsData) {
-      const name = person.names?.[0]?.displayName || ''
-      const email = person.emailAddresses?.[0]?.value || ''
-      let company = person.organizations?.[0]?.name || ''
-      
-      // If no company registered, guess from email domain
-      if (!company && email) {
-        const domain = email.split('@')[1]
-        if (domain) {
-          // Convert domain to company name: "acmecorp.com" → "Acme Corp"
+    console.log('[contacts/search] extracted', contactMap.size, 'unique email addresses')
+
+    // Filter by query match and build final contacts list
+    for (const [, contact] of contactMap) {
+      // Only show if name or email matches query
+      if (
+        contact.name?.toLowerCase().includes(query.toLowerCase()) ||
+        contact.email?.toLowerCase().includes(query.toLowerCase())
+      ) {
+        // Guess company from email domain
+        let company = ''
+        const domain = contact.email.split('@')[1]
+        if (domain && domain !== 'gmail.com' && domain !== 'yahoo.com' && domain !== 'outlook.com') {
           company = domain
-            .split('.')[0] // Remove TLD
-            .split('-').join(' ') // Replace hyphens with spaces
-            .split('_').join(' ') // Replace underscores with spaces
-            .split(/(?=[A-Z])/).join(' ') // Split camelCase
-            .replace(/\b\w/g, (l) => l.toUpperCase()) // Capitalize each word
+            .split('.')[0]
+            .split('-').join(' ')
+            .split('_').join(' ')
+            .replace(/\b\w/g, (l) => l.toUpperCase())
             .trim()
         }
-      }
-      
-      // Filter by query (client-side since API doesn't have great search)
-      if ((name?.toLowerCase().includes(query.toLowerCase()) || email?.toLowerCase().includes(query.toLowerCase())) && (name || email)) {
-        console.log('[contacts/search] found contact:', { name, email, company })
-        contacts.push({ name, email, company, source: 'google' })
+
+        console.log('[contacts/search] matched contact:', { name: contact.name, email: contact.email, company })
+        contacts.push({ name: contact.name, email: contact.email, company, source: 'gmail' })
       }
     }
   } catch (e) {
-    console.error('[contacts/search] people API error:', e instanceof Error ? e.message : String(e))
-    console.error('[contacts/search] full error:', e)
-    return NextResponse.json({ contacts: [], error: e instanceof Error ? e.message : String(e) }, { status: 500 })
+    console.error('[contacts/search] Gmail search error:', e instanceof Error ? e.message : String(e))
+    return NextResponse.json({ 
+      contacts: [], 
+      error: e instanceof Error ? e.message : 'Failed to search Gmail'
+    }, { status: 500 })
   }
 
-  // TODO: Email-based contact extraction disabled for now
-  // Reason: Gmail API full message format is slow, header parsing is complex
-  // Will re-implement with batch processing + caching in future version
-  console.log('[contacts/search] email extraction disabled (Gmail API optimization needed)')
-
   console.log('[contacts/search] returning', contacts.length, 'contacts')
-  console.log('[contacts/search] sample contacts:', contacts.slice(0, 3))
   return NextResponse.json({ contacts: contacts.slice(0, 8) })
 }
