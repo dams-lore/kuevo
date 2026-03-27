@@ -12,11 +12,10 @@ interface Block {
 
 export default function CreatePage() {
   const router = useRouter()
-  const [step, setStep] = useState(1)
   const [googleConnected, setGoogleConnected] = useState(false)
   const [checkingIntegration, setCheckingIntegration] = useState(true)
 
-  // Step 1: Contact info
+  // Section 1: Contact info
   const [prospectName, setProspectName] = useState('')
   const [company, setCompany] = useState('')
   const [prospectEmail, setProspectEmail] = useState('')
@@ -24,17 +23,16 @@ export default function CreatePage() {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [contactSearchLoading, setContactSearchLoading] = useState(false)
 
-  // Step 2: Intro message
+  // Section 2: Intro message
   const [introMessage, setIntroMessage] = useState('')
   const [generatingIntro, setGeneratingIntro] = useState(false)
 
-  // Step 3: Content
-  const [blocks, setBlocks] = useState<Block[]>([{ title: '', url: '' }])
+  // Section 3: Content
+  const [blocks, setBlocks] = useState<Block[]>([])
   const [fetchingContext, setFetchingContext] = useState(false)
 
-  // Step 4: Actions
+  // Section 4: Actions
   const [creating, setCreating] = useState(false)
-  const [sendingEmail, setSendingEmail] = useState(false)
 
   useEffect(() => {
     async function checkIntegration() {
@@ -59,7 +57,6 @@ export default function CreatePage() {
     if (val.length >= 2) {
       setContactSearchLoading(true)
       try {
-        console.log('[create] searching contacts for:', val)
         const res = await fetch(`/api/contacts/search?q=${encodeURIComponent(val)}`)
         const data = await res.json()
         if (data.contacts?.length > 0) {
@@ -119,7 +116,7 @@ export default function CreatePage() {
       const data = await res.json()
       if (data.intro) {
         setIntroMessage(data.intro)
-        toast.success('Context fetched from Gmail & Drive!')
+        toast.success('Content fetched!')
       }
       if (data.suggested_blocks?.length > 0) {
         const newBlocks = data.suggested_blocks.slice(0, 5).map((b: Block) => ({
@@ -130,7 +127,7 @@ export default function CreatePage() {
       }
       if (data.error) toast.error(data.error)
     } catch (e) {
-      toast.error('Error fetching context')
+      toast.error('Error fetching content')
     } finally {
       setFetchingContext(false)
     }
@@ -161,6 +158,7 @@ export default function CreatePage() {
       const data = await res.json()
       if (!res.ok) {
         toast.error(data.error || 'Failed to create page')
+        console.error('[create] error:', data)
         return
       }
 
@@ -173,7 +171,6 @@ export default function CreatePage() {
       toast.success('URL copied to clipboard!')
 
       if (sendEmail && googleConnected && prospectEmail) {
-        // TODO: Open email composer with pre-filled message
         const subject = `Resources for ${prospectName} at ${company}`
         const body = `Hi ${prospectName},\n\nHere are the resources we discussed:\n\n${pageUrl}\n\nFeel free to review at your pace.\n\nBest regards`
         window.location.href = `mailto:${prospectEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
@@ -182,6 +179,7 @@ export default function CreatePage() {
       }
     } catch (e) {
       toast.error('Error creating page')
+      console.error('[create] error:', e)
     } finally {
       setCreating(false)
     }
@@ -212,28 +210,21 @@ export default function CreatePage() {
       <main className="max-w-2xl mx-auto px-6 py-10">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Create a sharing page</h1>
-          <p className="text-gray-500">Step {step} of 4</p>
-          
-          {/* Progress bar */}
-          <div className="mt-4 h-1 bg-gray-200 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-violet-600 to-indigo-600 transition-all"
-              style={{ width: `${(step / 4) * 100}%` }}
-            ></div>
-          </div>
+          <p className="text-gray-500 text-sm">Share personalized resources with your prospect</p>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-sm">
-          {/* Step 1: Contact Info */}
-          {step === 1 && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Contact information</h2>
-              </div>
+        <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-sm space-y-8">
+          {/* Section 1: Contact */}
+          <section>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-violet-100 text-violet-700 text-sm font-bold mr-3">①</span>
+              Contact
+            </h2>
 
-              {/* Contact Name with Autocomplete */}
+            <div className="space-y-4">
+              {/* Contact Name */}
               <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Contact name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
                 <input
                   type="text"
                   value={prospectName}
@@ -273,7 +264,7 @@ export default function CreatePage() {
 
               {/* Company */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Company *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Company *</label>
                 <input
                   type="text"
                   value={company}
@@ -284,10 +275,10 @@ export default function CreatePage() {
                 />
               </div>
 
-              {/* Email (Optional) */}
+              {/* Email */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Contact email <span className="text-gray-400 font-normal">(optional — for sending)</span>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
                 <input
                   type="email"
@@ -297,74 +288,69 @@ export default function CreatePage() {
                   className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition text-sm"
                 />
               </div>
-
-              {/* Google Status */}
-              {!googleConnected && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                  <p className="text-sm text-amber-800">
-                    <span className="font-medium">Gmail & Drive not connected.</span> Go to <a href="/settings" className="underline">settings</a> to connect Google and enable email/file features.
-                  </p>
-                </div>
-              )}
             </div>
-          )}
+          </section>
 
-          {/* Step 2: Intro Message */}
-          {step === 2 && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-1">Page intro</h2>
-                <p className="text-sm text-gray-500">Subject line + one engaging punchline</p>
+          {/* Divider */}
+          <div className="border-t border-gray-200"></div>
+
+          {/* Section 2: Intro Message */}
+          <section>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-violet-100 text-violet-700 text-sm font-bold mr-3">②</span>
+              Intro message
+            </h2>
+
+            <div className="space-y-3">
+              <p className="text-sm text-gray-600">Subject line + one engaging punchline</p>
+
+              <div className="flex gap-2">
+                {googleConnected && (
+                  <button
+                    onClick={fetchGoogleContext}
+                    disabled={fetchingContext || !company}
+                    className="text-sm px-3 py-2 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg transition disabled:opacity-50 font-medium"
+                  >
+                    {fetchingContext ? 'Fetching...' : '✨ Fetch context'}
+                  </button>
+                )}
+                <button
+                  onClick={generateIntro}
+                  disabled={generatingIntro || !company}
+                  className="text-sm px-3 py-2 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg transition disabled:opacity-50 font-medium"
+                >
+                  {generatingIntro ? 'Generating...' : '✨ Generate with AI'}
+                </button>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-700">Intro message</label>
-                  <div className="flex gap-2">
-                    {googleConnected && (
-                      <button
-                        onClick={fetchGoogleContext}
-                        disabled={fetchingContext || !company}
-                        className="text-xs px-3 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg transition disabled:opacity-50"
-                      >
-                        {fetchingContext ? 'Fetching...' : '✨ Fetch from Gmail'}
-                      </button>
-                    )}
-                    <button
-                      onClick={generateIntro}
-                      disabled={generatingIntro || !company}
-                      className="text-xs px-3 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg transition disabled:opacity-50"
-                    >
-                      {generatingIntro ? 'Generating...' : '✨ Generate with AI'}
-                    </button>
-                  </div>
-                </div>
-                <textarea
-                  rows={5}
-                  value={introMessage}
-                  onChange={(e) => setIntroMessage(e.target.value)}
-                  placeholder="Write a personalized message for your prospect..."
-                  className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition resize-none"
-                />
-              </div>
+              <textarea
+                rows={4}
+                value={introMessage}
+                onChange={(e) => setIntroMessage(e.target.value)}
+                placeholder="Subject line&#10;One engaging punchline about value"
+                className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition resize-none text-sm"
+              />
             </div>
-          )}
+          </section>
 
-          {/* Step 3: Content */}
-          {step === 3 && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-1">Content links</h2>
-                <p className="text-sm text-gray-500">Files and resources to share</p>
-              </div>
+          {/* Divider */}
+          <div className="border-t border-gray-200"></div>
 
+          {/* Section 3: Content */}
+          <section>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-violet-100 text-violet-700 text-sm font-bold mr-3">③</span>
+              Content
+            </h2>
+
+            <div className="space-y-4">
               {googleConnected && (
                 <button
                   onClick={fetchGoogleContext}
                   disabled={fetchingContext || !company}
-                  className="w-full px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium text-sm"
+                  className="w-full text-sm px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
                 >
-                  {fetchingContext ? 'Fetching...' : '📁 Fetch content from Drive'}
+                  {fetchingContext ? 'Fetching...' : '📁 Fetch content'}
                 </button>
               )}
 
@@ -395,7 +381,7 @@ export default function CreatePage() {
                         className="px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition text-sm"
                       />
                     </div>
-                    {blocks.length > 1 && (
+                    {blocks.length > 0 && (
                       <button
                         onClick={() => setBlocks(blocks.filter((_, idx) => idx !== i))}
                         type="button"
@@ -412,75 +398,53 @@ export default function CreatePage() {
                 <button
                   onClick={() => setBlocks([...blocks, { title: '', url: '' }])}
                   type="button"
-                  className="text-sm text-violet-600 hover:text-violet-800 transition"
+                  className="text-sm text-violet-600 hover:text-violet-800 transition font-medium"
                 >
-                  + Add another link
+                  + Add link
                 </button>
               )}
             </div>
-          )}
+          </section>
 
-          {/* Step 4: Actions */}
-          {step === 4 && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Ready to share?</h2>
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <p className="text-sm text-gray-700">
-                    <span className="font-medium">{prospectName}</span> at <span className="font-medium">{company}</span>
+          {/* Divider */}
+          <div className="border-t border-gray-200"></div>
+
+          {/* Section 4: Send */}
+          <section>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-violet-100 text-violet-700 text-sm font-bold mr-3">④</span>
+              Send
+            </h2>
+
+            <div className="space-y-3">
+              {!googleConnected && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-sm text-amber-800">
+                    Connect Google in <a href="/settings" className="underline font-medium">settings</a> to send emails.
                   </p>
                 </div>
-              </div>
-            </div>
-          )}
+              )}
 
-          {/* Navigation Buttons */}
-          <div className="flex gap-3 mt-8 pt-6 border-t border-gray-200">
-            {step > 1 && (
-              <button
-                onClick={() => setStep(step - 1)}
-                className="px-6 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition"
-              >
-                ← Back
-              </button>
-            )}
-
-            {step < 4 && (
-              <button
-                onClick={() => {
-                  if (step === 1 && (!prospectName || !company)) {
-                    toast.error('Please fill in contact name and company')
-                    return
-                  }
-                  setStep(step + 1)
-                }}
-                className="flex-1 px-6 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-medium rounded-lg transition"
-              >
-                Next →
-              </button>
-            )}
-
-            {step === 4 && (
-              <div className="flex-1 flex gap-3">
+              <div className="flex gap-3">
                 <button
                   onClick={() => createPage(false)}
-                  disabled={creating}
-                  className="flex-1 px-6 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+                  disabled={creating || !prospectName || !company}
+                  className="flex-1 px-6 py-2.5 bg-white border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
                 >
                   {creating ? '...' : '🔗 Generate link'}
                 </button>
                 {googleConnected && prospectEmail && (
                   <button
                     onClick={() => createPage(true)}
-                    disabled={creating || sendingEmail}
-                    className="flex-1 px-6 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-medium rounded-lg transition disabled:opacity-50"
+                    disabled={creating || !prospectName || !company}
+                    className="flex-1 px-6 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-semibold rounded-lg transition disabled:opacity-50"
                   >
-                    {creating || sendingEmail ? '...' : '📧 Generate + Send email'}
+                    {creating ? '...' : '📧 Generate + Send'}
                   </button>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          </section>
         </div>
       </main>
     </div>
