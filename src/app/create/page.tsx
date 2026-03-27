@@ -72,7 +72,7 @@ export default function CreatePage() {
 
   async function generateIntro() {
     if (!prospectName || !company) {
-      setError('Please enter prospect name and company first')
+      setError('Please enter contact name and company first')
       return
     }
     setGenerating(true)
@@ -95,7 +95,7 @@ export default function CreatePage() {
 
   async function fetchGoogleContext() {
     if (!prospectName || !company) {
-      setError('Please enter prospect name and company first')
+      setError('Please enter contact name and company first')
       return
     }
     setFetchingContext(true)
@@ -126,7 +126,7 @@ export default function CreatePage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!prospectName || !company) {
-      setError('Prospect name and company are required')
+      setError('Contact name and company are required')
       return
     }
     setLoading(true)
@@ -390,7 +390,7 @@ export default function CreatePage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Prospect name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Contact name *</label>
                 <input
                   type="text"
                   value={prospectName}
