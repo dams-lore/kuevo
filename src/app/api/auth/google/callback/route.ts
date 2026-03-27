@@ -23,34 +23,11 @@ export async function GET(req: Request) {
 
   const session = data.session
   console.log('[auth/callback] session created for user:', session.user.id)
+  console.log('[auth/callback] provider_token available server-side:', !!session.provider_token)
 
-  // Extract Google provider tokens
-  const providerToken = session.provider_token
-  const providerRefreshToken = session.provider_refresh_token
+  // Note: provider_token is NOT available server-side with @supabase/ssr
+  // It will be captured client-side by GoogleTokenSaver component on dashboard
 
-  if (!providerToken) {
-    console.error('[auth/callback] no provider_token in session')
-    return NextResponse.redirect(new URL('/login?error=no_provider_token', req.url))
-  }
-
-  console.log('[auth/callback] storing Google tokens for user:', session.user.id)
-
-  // Save to integrations table
-  const { error: integrationError } = await supabase
-    .from('integrations')
-    .upsert({
-      user_id: session.user.id,
-      provider: 'google',
-      access_token: providerToken,
-      refresh_token: providerRefreshToken || null,
-      expires_at: new Date(Date.now() + 3600 * 1000).toISOString(), // 1 hour default
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id' })
-
-  if (integrationError) {
-    console.error('[auth/callback] integration upsert error:', integrationError)
-  }
-
-  // Redirect to dashboard
+  // Redirect to dashboard where GoogleTokenSaver will run
   return NextResponse.redirect(new URL('/dashboard', req.url))
 }
