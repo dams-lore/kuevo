@@ -77,8 +77,7 @@ export async function GET(req: Request) {
     console.log('[contacts/search] fetching recent emails for contact extraction...')
     const emailRes = await gmail.users.messages.list({
       userId: 'me',
-      maxResults: 50,
-      q: 'in:sent OR in:inbox',
+      maxResults: 30,
     })
 
     const emailContactMap = new Map<string, { name: string; email: string }>()
@@ -88,62 +87,65 @@ export async function GET(req: Request) {
         const full = await gmail.users.messages.get({
           userId: 'me',
           id: msg.id!,
-          format: 'metadata',
-          metadataHeaders: ['From', 'To', 'Cc'],
+          format: 'full',
         })
 
+        // Get headers safely
         const headers = full.data.payload?.headers || []
-        const parseEmailHeader = (header: string) => {
-          // Parse "Name <email@domain.com>" or just "email@domain.com"
-          const match = header.match(/^"?([^"<]*)"?\s*<([^>]+)>|^([^<\s]+@[^<\s]+)/)
-          if (match) {
-            let name = match[1] || ''
-            let email = match[2] || match[3] || ''
-            
-            // Clean up name
-            name = name
-              .trim()
-              .replace(/^["']|["']$/g, '') // Remove quotes
-              .replace(/\s+via\s+.*$/i, '') // Remove "via ..." suffixes
-            
-            // Only accept if we have a valid email
+        const getHeader = (name: string) => headers.find(h => h.name === name)?.value || ''
+        
+        const fromHeader = getHeader('From')
+        const toHeader = getHeader('To')
+        
+        // Simple email parsing: extract "Name <email@domain.com>" or just "email@domain.com"
+        const extractEmails = (headerStr: string) => {
+          if (!headerStr) return []
+          const results = []
+          // Match patterns like: "John Doe" <john@example.com> or john@example.com or john.doe@example.com
+          const emailRegex = /([^<>"]*?)\s*<([^>]+@[^>]+)>|([a-z0-9._%+-]+@[a-z0-9.-]+)/gi
+          let match
+          while ((match = emailRegex.exec(headerStr)) !== null) {
+            let name = (match[1] || match[3] || '').trim()
+            let email = match[2] || match[3]
             if (email && email.includes('@')) {
-              return { name: name || email.split('@')[0], email }
+              results.push({ name, email: email.toLowerCase() })
             }
           }
-          return null
+          return results
         }
 
-        for (const headerName of ['From', 'To', 'Cc']) {
-          const header = headers.find(h => h.name === headerName)?.value
-          if (header) {
-            // Split by comma for multiple recipients
-            for (const part of header.split(',')) {
-              const parsed = parseEmailHeader(part.trim())
-              if (parsed && parsed.email && !emailContactMap.has(parsed.email.toLowerCase())) {
-                emailContactMap.set(parsed.email.toLowerCase(), parsed)
-              }
-            }
+        const fromEmails = extractEmails(fromHeader)
+        const toEmails = extractEmails(toHeader)
+        
+        console.log('[contacts/search] extracted from email:', { fromEmails, toEmails })
+
+        // Add all extracted emails to map
+        for (const contact of [...fromEmails, ...toEmails]) {
+          if (!emailContactMap.has(contact.email)) {
+            // Use name if available, otherwise extract from email prefix
+            const finalName = contact.name || contact.email.split('@')[0]
+            emailContactMap.set(contact.email, { name: finalName, email: contact.email })
           }
         }
       } catch (e) {
-        // Skip individual message errors
+        console.error('[contacts/search] error processing message:', e)
       }
     }
 
+    console.log('[contacts/search] total email contacts extracted:', emailContactMap.size)
+
     // Filter email contacts by query and add to results
     for (const [, contact] of emailContactMap) {
-      // Only add if name looks real (not a service email or just domain)
-      const isRealName = contact.name && 
-        contact.name.length > 2 && 
-        !contact.name.includes('@') &&
-        !['noreply', 'no-reply', 'donotreply', 'support', 'info', 'hello', 'contact'].includes(contact.name.toLowerCase())
+      // Skip service emails
+      const serviceEmails = ['noreply', 'no-reply', 'donotreply', 'support', 'info', 'hello', 'contact', 'notifications', 'alerts']
+      const emailPrefix = contact.email.split('@')[0].toLowerCase()
+      const isServiceEmail = serviceEmails.some(s => emailPrefix.includes(s))
       
-      if (isRealName && 
+      if (!isServiceEmail &&
           (contact.name?.toLowerCase().includes(query.toLowerCase()) || 
            contact.email?.toLowerCase().includes(query.toLowerCase())) &&
           !contacts.find(c => c.email === contact.email)) {
-        console.log('[contacts/search] found email contact:', contact)
+        console.log('[contacts/search] adding email contact:', contact)
         contacts.push({ name: contact.name, email: contact.email, company: '', source: 'google' })
       }
     }
