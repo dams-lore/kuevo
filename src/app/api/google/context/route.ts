@@ -168,11 +168,15 @@ export async function POST(req: Request) {
       return aScore - bScore
     })
 
-    driveFiles = sorted.slice(0, 10).map(f => ({
-      name: f.name || '',
-      webViewLink: f.webViewLink || '',
-      mimeType: f.mimeType || '',
-    }))
+    // CAP AT 3 FILES
+    driveFiles = sorted.slice(0, 3).map(f => {
+      console.log('[google/context] selected drive file:', { name: f.name, type: f.mimeType })
+      return {
+        name: f.name || '',
+        webViewLink: f.webViewLink || '',
+        mimeType: f.mimeType || '',
+      }
+    })
   } catch (e) {
     console.error('[google/context] drive error:', e)
   }
@@ -186,26 +190,37 @@ export async function POST(req: Request) {
     ? driveFiles.map(f => `- ${f.name} (${f.webViewLink})`).join('\n')
     : 'No relevant Drive files found.'
 
-  const prompt = `You are helping a sales rep prepare a personalized follow-up page for a prospect.
+  const prompt = `You are a sales follow-up expert helping prepare a personalized sharing page.
 
-Prospect: ${prospect_name} at ${company}
+PROSPECT: ${prospect_name} at ${company}
 
-Recent email history with this company:
+EMAIL CONTEXT:
 ${emailContext}
 
-Available files in Google Drive related to this company:
+AVAILABLE FILES:
 ${driveContext}
 
-Your task:
-1. Write a SHORT, personalized intro message (2-3 sentences, professional but warm) based on the actual email context above. Reference specific topics discussed if visible. Do NOT write a generic message — use the real context.
-2. Select up to 3 of the most relevant Drive files to share with this prospect. Only include files that have valid URLs.
+TASK: Generate a professional yet personal intro message for a follow-up page, plus suggest the most relevant files.
 
-Respond ONLY with valid JSON, no markdown, no explanation. Use this exact format:
+INTRO MESSAGE FORMAT (exactly 4 sentences max):
+1. Personalized opener mentioning the prospect/company (reference something from emails if available)
+2. Clear statement of what's being shared and why it's relevant
+3. Brief value statement
+4. Soft CTA (e.g., "Feel free to review at your pace")
+
+RULES:
+- Max 4 sentences total
+- Professional but warm tone
+- Reference specific topics from emails when available
+- Never generic — always personalized
+- Only suggest files with valid URLs (webViewLink)
+
+Respond ONLY with valid JSON, no markdown:
 {
-  "intro": "...",
+  "intro": "Personalized intro message here",
   "suggested_blocks": [
-    {"title": "...", "url": "..."},
-    {"title": "...", "url": "..."}
+    {"title": "File Name", "url": "https://drive.google.com/..."},
+    {"title": "File Name", "url": "https://drive.google.com/..."}
   ]
 }`
 
