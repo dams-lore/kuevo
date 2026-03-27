@@ -66,10 +66,12 @@ export async function POST(req: Request) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { prospect_name, company } = await req.json()
+  const { prospect_name, company, exclude_invoices = true, exclude_financial = true } = await req.json()
   if (!prospect_name || !company) {
     return NextResponse.json({ error: 'prospect_name and company are required' }, { status: 400 })
   }
+
+  console.log('[google/context] filters:', { exclude_invoices, exclude_financial })
 
   // Get integration tokens
   const { data: integration, error: intError } = await supabase
@@ -143,9 +145,18 @@ export async function POST(req: Request) {
   let driveFiles: DriveFile[] = []
 
   try {
+    // Build exclusion filters
+    let exclusions = ''
+    if (exclude_invoices) {
+      exclusions += ' and not name contains "invoice" and not name contains "receipt"'
+    }
+    if (exclude_financial) {
+      exclusions += ' and not name contains "financial" and not name contains "budget" and not name contains "p&l" and not name contains "expense"'
+    }
+
     // Search by company name as keyword (not by domain)
     // Try specific search first — NO SPREADSHEETS (security risk)
-    const driveQuery = `name contains '${company}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")`
+    const driveQuery = `name contains '${company}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions}`
     console.log('[google/context] drive query:', driveQuery)
 
     const filesRes = await drive.files.list({
@@ -162,7 +173,7 @@ export async function POST(req: Request) {
     if (allFiles.length < 3) {
       console.log('[google/context] fallback: searching for 5 most recent files (docs, presentations, pdfs only)')
       const fallbackRes = await drive.files.list({
-        q: 'trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")',
+        q: `trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions}`,
         fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
         pageSize: 5,
         orderBy: 'modifiedTime desc',

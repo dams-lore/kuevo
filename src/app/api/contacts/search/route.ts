@@ -46,53 +46,30 @@ export async function GET(req: Request) {
   const peopleApi = google.people({ version: 'v1', auth: oauth2Client })
 
   try {
-    // Search in regular contacts
-    console.log('[contacts/search] searching contacts with query:', query)
-    const res = await peopleApi.people.searchContacts({
-      query,
-      readMask: 'names,emailAddresses,organizations',
-      pageSize: 10,
+    // The People API searchContacts might not be available - use connections list instead
+    // Get all contacts and filter client-side
+    console.log('[contacts/search] fetching connections with query:', query)
+    const res = await peopleApi.people.connections.list({
+      resourceName: 'people/me',
+      pageSize: 100,
+      personFields: 'names,emailAddresses,organizations',
+      sortOrder: 'FIRST_NAME_ASCENDING',
     })
 
-    console.log('[contacts/search] people API results:', res.data.results?.length || 0, 'contacts')
-    for (const person of res.data.results || []) {
-      const p = person.person
-      if (!p) continue
-      const name = p.names?.[0]?.displayName || ''
-      const email = p.emailAddresses?.[0]?.value || ''
-      const company = p.organizations?.[0]?.name || ''
-      console.log('[contacts/search] found contact:', { name, email, company })
-      if (name || email) {
+    console.log('[contacts/search] connections API results:', res.data.connections?.length || 0, 'contacts')
+    for (const person of res.data.connections || []) {
+      const name = person.names?.[0]?.displayName || ''
+      const email = person.emailAddresses?.[0]?.value || ''
+      const company = person.organizations?.[0]?.name || ''
+      
+      // Filter by query (client-side since API doesn't have great search)
+      if ((name?.toLowerCase().includes(query.toLowerCase()) || email?.toLowerCase().includes(query.toLowerCase())) && (name || email)) {
+        console.log('[contacts/search] found contact:', { name, email, company })
         contacts.push({ name, email, company, source: 'google' })
       }
     }
   } catch (e) {
     console.error('[contacts/search] people API error:', e instanceof Error ? e.message : String(e))
-  }
-
-  // Also search otherContacts if results < 5
-  if (contacts.length < 5) {
-    try {
-      console.log('[contacts/search] searching otherContacts...')
-      const res = await peopleApi.otherContacts.search({
-        query,
-        readMask: 'names,emailAddresses,organizations',
-        pageSize: 5,
-      })
-      console.log('[contacts/search] otherContacts API results:', res.data.results?.length || 0)
-      for (const person of res.data.results || []) {
-        const p = person.person
-        if (!p) continue
-        const name = p.names?.[0]?.displayName || ''
-        const email = p.emailAddresses?.[0]?.value || ''
-        const company = p.organizations?.[0]?.name || ''
-        if ((name || email) && !contacts.find(c => c.email === email)) {
-          contacts.push({ name, email, company, source: 'google' })
-        }
-      }
-    } catch (e) {
-      console.error('[contacts/search] otherContacts error:', e instanceof Error ? e.message : String(e))
-    }
   }
 
   console.log('[contacts/search] returning', contacts.length, 'contacts')
