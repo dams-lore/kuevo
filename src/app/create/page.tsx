@@ -376,17 +376,33 @@ export default function CreatePage() {
               )}
             </div>
             {integration ? (
-              <button
-                onClick={fetchGoogleContext}
-                disabled={fetchingContext || !company}
-                className="text-xs px-3 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg transition disabled:opacity-50"
-              >
-                {fetchingContext ? 'Fetching...' : '✨ Fetch context'}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={fetchGoogleContext}
+                  disabled={fetchingContext || !company}
+                  className="text-xs px-3 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg transition disabled:opacity-50"
+                >
+                  {fetchingContext ? 'Fetching...' : '✨ Fetch context'}
+                </button>
+                <button
+                  onClick={async () => {
+                    const { error } = await supabaseBrowser
+                      .from('integrations')
+                      .delete()
+                      .eq('user_id', (await supabaseBrowser.auth.getUser()).data.user?.id)
+                    if (!error) {
+                      setIntegration(null)
+                    }
+                  }}
+                  className="text-xs px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg transition"
+                >
+                  Disconnect
+                </button>
+              </div>
             ) : (
               <a
                 href="/api/auth/google"
-                className="text-xs px-3 py-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg transition"
+                className="text-xs px-3 py-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg transition font-medium"
               >
                 Connect Google
               </a>

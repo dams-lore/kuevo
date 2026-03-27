@@ -30,7 +30,7 @@ export async function GET() {
       'profile',
     ].join(' '),
     access_type: 'offline',
-    prompt: 'consent',
+    prompt: 'consent', // Force re-ask for permissions even if already connected
   })
 
   return NextResponse.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`)
