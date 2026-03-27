@@ -30,6 +30,32 @@ function buildGmailQuery(domains: string[]): string {
   return domainFilters
 }
 
+// Detect language from email subjects/snippets
+function detectLanguage(emailSummaries: string[]): string {
+  if (emailSummaries.length === 0) return 'English'
+
+  // Simple heuristic: check for common non-English patterns
+  const combined = emailSummaries.join(' ').toLowerCase()
+
+  // French indicators
+  if (combined.match(/\b(bonjour|cordialement|merci|à|é|è|ê|ù|ç)\b/gi)?.length || 0 > 3) {
+    return 'French'
+  }
+
+  // Spanish indicators
+  if (combined.match(/\b(hola|gracias|señor|señora|estimado|cordialmente|español)\b/gi)?.length || 0 > 3) {
+    return 'Spanish'
+  }
+
+  // German indicators
+  if (combined.match(/\b(hallo|danke|mein|ihre|grüße|mit|freundlichen)\b/gi)?.length || 0 > 3) {
+    return 'German'
+  }
+
+  // Default to English
+  return 'English'
+}
+
 async function refreshTokenIfNeeded(
   oauth2Client: InstanceType<typeof google.auth.OAuth2>,
   integration: { access_token: string; refresh_token: string | null; expires_at: string | null },
@@ -264,8 +290,11 @@ export async function POST(req: Request) {
     : 'No relevant Drive files found.'
 
   const topicsStr = uniqueTopics.length > 0 ? `Topics discussed: ${uniqueTopics.join(', ')}` : 'No specific topics extracted'
+  const detectedLanguage = detectLanguage(emailSummaries)
+  console.log('[google/context] detected language:', detectedLanguage)
 
   const prompt = `You are a sales follow-up expert helping prepare a personalized sharing page.
+IMPORTANT: Respond in ${detectedLanguage}. The emails below are in ${detectedLanguage}.
 
 PROSPECT: ${prospect_name} at ${company}
 

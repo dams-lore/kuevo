@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     max_tokens: 300,
     messages: [{
       role: 'user',
-      content: `Write a short, personalized intro message (2-3 sentences, friendly but professional) for a sales follow-up page sent to ${prospect_name} from ${company}. The page contains resources shared after a sales call. No subject line, no greeting — just the body text. Start directly with the value.`
+      content: `Write a short, personalized intro message (2-3 sentences, friendly but professional) for a sales follow-up page sent to ${prospect_name} from ${company}. The page contains resources shared after a sales call. No subject line, no greeting — just the body text. Start directly with the value. Respond in English.`
     }]
   })
 
