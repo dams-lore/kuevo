@@ -236,12 +236,20 @@ export default function Home() {
         <span className="text-lg font-bold tracking-tight bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
           kuevo
         </span>
-        <button
-          onClick={scrollToForm}
-          className="text-sm font-semibold text-slate-700 hover:text-violet-600 transition-colors"
-        >
-          Get early access
-        </button>
+        <div className="flex items-center gap-3">
+          <a
+            href="/login"
+            className="text-sm font-semibold text-violet-600 border border-violet-600 hover:bg-violet-600 hover:text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            Sign in
+          </a>
+          <button
+            onClick={scrollToForm}
+            className="text-sm font-semibold text-slate-700 hover:text-violet-600 transition-colors"
+          >
+            Get early access
+          </button>
+        </div>
       </nav>
 
       {/* Hero */}
