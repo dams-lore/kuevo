@@ -63,7 +63,7 @@ export async function GET(req: Request) {
       const company = person.organizations?.[0]?.name || ''
       
       // Debug: log organization data
-      if (person.organizations?.length > 0) {
+      if (person.organizations && person.organizations.length > 0) {
         console.log('[contacts/search] person has org:', { name, organizations: person.organizations })
       }
       
