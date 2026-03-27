@@ -367,6 +367,21 @@ Respond ONLY with valid JSON, no markdown:
     const jsonStr = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
     const result = JSON.parse(jsonStr)
 
+    // ANTI-HALLUCINATION: Validate suggested blocks are from available content
+    if (result.suggested_blocks && Array.isArray(result.suggested_blocks)) {
+      const availableUrls = new Set(allContent.map(c => c.url))
+      
+      result.suggested_blocks = result.suggested_blocks.filter((block: any) => {
+        const isReal = availableUrls.has(block.url)
+        if (!isReal) {
+          console.warn('[google/context] BLOCKED hallucinated content:', block)
+        }
+        return isReal
+      })
+      
+      console.log('[google/context] filtered to', result.suggested_blocks.length, 'verified blocks')
+    }
+
     // Validate shape
     if (!result.intro || typeof result.intro !== 'string') {
       throw new Error('Missing intro in Claude response')
