@@ -291,9 +291,36 @@ export async function POST(req: Request) {
     ? emailSummaries.join('\n\n---\n\n')
     : 'No emails found with this company domain.'
 
-  const driveContext = driveFiles.length > 0
-    ? driveFiles.map(f => `- ${f.name} (${f.webViewLink})`).join('\n')
-    : 'No relevant Drive files found.'
+  // Also fetch from external sources
+  let externalArticles: Array<{ title: string; url: string }> = []
+  try {
+    const externalRes = await fetch('https://kuevo.io/api/external-sources/fetch', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${integration.access_token}` // Pass through auth
+      },
+      body: JSON.stringify({ user_id: session.user.id }),
+    })
+    
+    if (externalRes.ok) {
+      const externalData = await externalRes.json()
+      externalArticles = externalData.articles || []
+      console.log('[google/context] fetched', externalArticles.length, 'articles from external sources')
+    }
+  } catch (e) {
+    console.error('[google/context] failed to fetch external sources:', e)
+  }
+
+  // Combine Drive files and external articles
+  const allContent = [
+    ...driveFiles.map(f => ({ title: f.name, url: f.webViewLink, type: 'drive' })),
+    ...externalArticles.map(a => ({ title: a.title, url: a.url, type: 'external' }))
+  ]
+
+  const driveContext = allContent.length > 0
+    ? allContent.map(c => `- ${c.title} (${c.url})`).join('\n')
+    : 'No relevant content found.'
 
   const emailSubjectsStr = emailSummaries.slice(0, 3).join(' | ') || 'No emails found'
   const detectedLanguage = detectLanguage(emailSummaries)
@@ -310,16 +337,19 @@ Context about the contact:
 - Recent email subjects: ${emailSubjectsStr}
 - Detected language: ${detectedLanguage}
 
-Respond ONLY in ${detectedLanguage}. No greetings, no signature, no extra text. Just 2 lines.
+Available content (real sources only):
+${driveContext}
 
-Also suggest up to 3 relevant files that match the topics discussed.
+CRITICAL: You MUST suggest ONLY the files/articles listed above. Do NOT invent or hallucinate any content.
+Respond ONLY in ${detectedLanguage}. No greetings, no signature, no extra text. Just 2 lines.
+Suggest up to 3 relevant items from the available content list that match the topics discussed.
 
 Respond ONLY with valid JSON, no markdown:
 {
   "intro": "Line 1\\nLine 2",
   "suggested_blocks": [
-    {"title": "File Name", "url": "https://..."},
-    {"title": "File Name", "url": "https://..."}
+    {"title": "Exact title from available content", "url": "Exact URL from available content"},
+    {"title": "Exact title from available content", "url": "Exact URL from available content"}
   ]
 }`
 

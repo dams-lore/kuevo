@@ -79,6 +79,11 @@ export default function SettingsPage() {
   const [loadingFolders, setLoadingFolders] = useState(false)
   const [folderSearchQuery, setFolderSearchQuery] = useState('')
   const [googleConnected, setGoogleConnected] = useState(false)
+  const [externalSources, setExternalSources] = useState<any[]>([])
+  const [newSourceUrl, setNewSourceUrl] = useState('')
+  const [newSourceTitle, setNewSourceTitle] = useState('')
+  const [newSourceType, setNewSourceType] = useState<'blog' | 'rss'>('blog')
+  const [addingSource, setAddingSource] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -122,6 +127,17 @@ export default function SettingsPage() {
           .insert({ id: authUser.id })
         setProfile({ id: authUser.id })
       }
+
+      // Load external sources
+      const { data: sources } = await supabaseBrowser
+        .from('external_sources')
+        .select('*')
+        .eq('user_id', authUser.id)
+      
+      if (sources) {
+        setExternalSources(sources)
+      }
+
       setLoading(false)
     }
     load()
@@ -184,6 +200,62 @@ export default function SettingsPage() {
       setTimeout(() => setMessage(''), 3000)
     } else {
       setMessage('Error disconnecting: ' + error.message)
+    }
+  }
+
+  async function handleAddExternalSource() {
+    if (!newSourceUrl) {
+      setMessage('Error: URL is required')
+      return
+    }
+
+    try {
+      new URL(newSourceUrl)
+    } catch {
+      setMessage('Error: Invalid URL')
+      return
+    }
+
+    setAddingSource(true)
+    const { error } = await supabaseBrowser
+      .from('external_sources')
+      .insert({
+        source_type: newSourceType,
+        url: newSourceUrl,
+        title: newSourceTitle || null,
+      })
+
+    if (!error) {
+      setNewSourceUrl('')
+      setNewSourceTitle('')
+      // Reload sources
+      const { data: sources } = await supabaseBrowser
+        .from('external_sources')
+        .select('*')
+        .eq('user_id', user?.id)
+      if (sources) setExternalSources(sources)
+      setMessage('Source added!')
+      setTimeout(() => setMessage(''), 3000)
+    } else {
+      setMessage('Error: ' + error.message)
+    }
+    setAddingSource(false)
+  }
+
+  async function handleDeleteExternalSource(sourceId: string) {
+    if (!window.confirm('Delete this source?')) return
+
+    const { error } = await supabaseBrowser
+      .from('external_sources')
+      .delete()
+      .eq('id', sourceId)
+
+    if (!error) {
+      setExternalSources(externalSources.filter(s => s.id !== sourceId))
+      setMessage('Source deleted')
+      setTimeout(() => setMessage(''), 3000)
+    } else {
+      setMessage('Error: ' + error.message)
     }
   }
 
@@ -282,6 +354,71 @@ export default function SettingsPage() {
               </div>
             )}
             <p className="text-xs text-gray-500 mt-2">Required to search Gmail contacts and Drive files</p>
+          </div>
+
+          {/* External Content Sources */}
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">External Content Sources</h2>
+            <p className="text-sm text-gray-600 mb-4">Add blog URLs or RSS feeds to include their content when fetching materials for prospects</p>
+
+            <div className="space-y-4 mb-6">
+              {externalSources.map((source) => (
+                <div key={source.id} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">{source.title || source.url}</p>
+                    <p className="text-xs text-gray-500 mt-1">{source.url}</p>
+                    <p className="text-xs text-gray-400 mt-1">{source.source_type}</p>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteExternalSource(source.id)}
+                    className="text-xs text-red-600 hover:text-red-800 ml-4"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-3 bg-violet-50 border border-violet-200 rounded-lg p-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Source type</label>
+                <select
+                  value={newSourceType}
+                  onChange={(e) => setNewSourceType(e.target.value as 'blog' | 'rss')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                >
+                  <option value="blog">Blog / Website</option>
+                  <option value="rss">RSS Feed</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">URL</label>
+                <input
+                  type="url"
+                  value={newSourceUrl}
+                  onChange={(e) => setNewSourceUrl(e.target.value)}
+                  placeholder="https://blog.example.com or https://example.com/feed.xml"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title (optional)</label>
+                <input
+                  type="text"
+                  value={newSourceTitle}
+                  onChange={(e) => setNewSourceTitle(e.target.value)}
+                  placeholder="e.g., Company Blog"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+              </div>
+              <button
+                onClick={handleAddExternalSource}
+                disabled={addingSource || !newSourceUrl}
+                className="w-full px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50"
+              >
+                {addingSource ? 'Adding...' : '+ Add source'}
+              </button>
+            </div>
           </div>
 
           {/* Save Button */}
