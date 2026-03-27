@@ -19,6 +19,10 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [showFolderBrowser, setShowFolderBrowser] = useState(false)
+  const [availableFolders, setAvailableFolders] = useState<Array<{ id: string; name: string }>>([])
+  const [selectedFolderIds, setSelectedFolderIds] = useState<Set<string>>(new Set())
+  const [loadingFolders, setLoadingFolders] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -40,7 +44,9 @@ export default function SettingsPage() {
       if (existingProfile) {
         setProfile(existingProfile)
         setBlogUrl(existingProfile.blog_url || '')
-        setSelectedFolders(existingProfile.selected_drive_folders?.join(',') || '')
+        const folderIds = existingProfile.selected_drive_folders || []
+        setSelectedFolders(folderIds.join(','))
+        setSelectedFolderIds(new Set(folderIds))
       } else {
         // Create profile if doesn't exist
         await supabaseBrowser
@@ -53,17 +59,34 @@ export default function SettingsPage() {
     load()
   }, [router])
 
+  async function handleOpenFolderBrowser() {
+    setShowFolderBrowser(true)
+    setLoadingFolders(true)
+    try {
+      const res = await fetch('/api/drive/folders')
+      const data = await res.json()
+      if (data.folders) {
+        setAvailableFolders(data.folders)
+      }
+    } catch (e) {
+      setMessage('Error loading folders: ' + (e instanceof Error ? e.message : String(e)))
+    } finally {
+      setLoadingFolders(false)
+    }
+  }
+
   async function handleSave() {
     if (!user) return
     setSaving(true)
     setMessage('')
 
+    const folderIds = Array.from(selectedFolderIds)
     const { error } = await supabaseBrowser
       .from('user_profiles')
       .upsert({
         id: user.id,
         blog_url: blogUrl || null,
-        selected_drive_folders: selectedFolders ? selectedFolders.split(',').map(f => f.trim()).filter(f => f) : null,
+        selected_drive_folders: folderIds.length > 0 ? folderIds : null,
         updated_at: new Date().toISOString(),
       })
 
@@ -141,16 +164,18 @@ export default function SettingsPage() {
           {/* Drive Folders */}
           <div>
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Drive Content Sources</h2>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Allowed Drive Folder IDs (optional)</label>
-            <textarea
-              value={selectedFolders}
-              onChange={(e) => setSelectedFolders(e.target.value)}
-              placeholder="Paste Google Drive folder IDs, separated by commas&#10;Example: 1a2b3c4d5e6f7g8h9i0j, 2b3c4d5e6f7g8h9i0j1k"
-              rows={4}
-              className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition resize-none"
-            />
-            <p className="text-xs text-gray-500 mt-1">If empty, all your Drive files are searchable. Enter folder IDs to limit to specific folders only.</p>
-            <p className="text-xs text-gray-500 mt-2">To find a folder ID: right-click the folder in Google Drive → Get link → copy the ID from the URL</p>
+            <p className="text-sm text-gray-600 mb-3">
+              {selectedFolderIds.size === 0 
+                ? 'All your Drive files will be searchable.' 
+                : `${selectedFolderIds.size} folder${selectedFolderIds.size !== 1 ? 's' : ''} selected. Only these folders will be searchable.`}
+            </p>
+            <button
+              onClick={handleOpenFolderBrowser}
+              className="px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium text-sm"
+            >
+              Browse & Select Folders
+            </button>
+            <p className="text-xs text-gray-500 mt-2">Leave empty to search all Drive files. Select specific folders to limit content sources.</p>
           </div>
 
           {/* Google Integration */}
@@ -182,6 +207,66 @@ export default function SettingsPage() {
           </div>
         </div>
       </main>
+
+      {/* Folder Browser Modal */}
+      {showFolderBrowser && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-96 flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Select Drive Folders</h3>
+              <button 
+                onClick={() => setShowFolderBrowser(false)} 
+                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
+              {loadingFolders ? (
+                <div className="text-center py-8 text-gray-500">Loading folders...</div>
+              ) : availableFolders.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">No folders found</div>
+              ) : (
+                availableFolders.map(folder => (
+                  <label key={folder.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedFolderIds.has(folder.id)}
+                      onChange={(e) => {
+                        const newIds = new Set(selectedFolderIds)
+                        if (e.target.checked) {
+                          newIds.add(folder.id)
+                        } else {
+                          newIds.delete(folder.id)
+                        }
+                        setSelectedFolderIds(newIds)
+                      }}
+                      className="w-4 h-4 rounded border-gray-300 text-violet-600 cursor-pointer"
+                    />
+                    <span className="text-sm text-gray-900">{folder.name}</span>
+                  </label>
+                ))
+              )}
+            </div>
+
+            <div className="flex gap-3 px-6 py-4 border-t border-gray-200">
+              <button
+                onClick={() => setShowFolderBrowser(false)}
+                className="flex-1 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setShowFolderBrowser(false)}
+                className="flex-1 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-medium rounded-lg transition text-sm"
+              >
+                Done ({selectedFolderIds.size} selected)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
