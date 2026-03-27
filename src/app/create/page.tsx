@@ -5,6 +5,13 @@ import { supabaseBrowser } from '@/lib/supabase-browser'
 import { useRouter } from 'next/navigation'
 import { Toaster, toast } from 'sonner'
 
+declare global {
+  interface Window {
+    gapi: any
+    google: any
+  }
+}
+
 interface Block {
   title: string
   url: string
@@ -51,7 +58,55 @@ export default function CreatePage() {
       setCheckingIntegration(false)
     }
     checkIntegration()
+
+    // Load Google API
+    const script = document.createElement('script')
+    script.src = 'https://apis.google.com/js/api.js'
+    script.async = true
+    script.defer = true
+    document.body.appendChild(script)
   }, [])
+
+  function openDrivePicker(blockIndex: number) {
+    if (!window.gapi || !window.gapi.load) {
+      toast.error('Google API not loaded yet. Please try again.')
+      return
+    }
+
+    const { data: { session } } = supabaseBrowser.auth.getSession().then(res => res.data)
+    if (!session) {
+      toast.error('Not authenticated')
+      return
+    }
+
+    window.gapi.load('picker', { callback: () => {
+      const token = localStorage.getItem('sb-auth-token') // Try to get token from storage
+      
+      if (!token) {
+        toast.error('Authentication required. Please reconnect Google.')
+        return
+      }
+
+      const picker = new window.google.picker.PickerBuilder()
+        .addView(window.google.picker.ViewId.DOCS)
+        .setOAuthToken(token)
+        .setCallback((data: any) => {
+          if (data.action === window.google.picker.Action.PICKED) {
+            const file = data.docs[0]
+            if (file) {
+              const updated = [...blocks]
+              updated[blockIndex].title = file.name
+              updated[blockIndex].url = file.url
+              setBlocks(updated)
+              toast.success('File added!')
+            }
+          }
+        })
+        .build()
+      
+      picker.setVisible(true)
+    } })
+  }
 
   async function handleContactSearch(val: string) {
     setProspectName(val)
@@ -409,6 +464,16 @@ export default function CreatePage() {
                         className="px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition text-sm"
                       />
                     </div>
+                    {googleConnected && (
+                      <button
+                        onClick={() => openDrivePicker(i)}
+                        type="button"
+                        className="text-xs px-2 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition"
+                        title="Browse Drive"
+                      >
+                        📁
+                      </button>
+                    )}
                     {blocks.length > 0 && (
                       <button
                         onClick={() => setBlocks(blocks.filter((_, idx) => idx !== i))}
