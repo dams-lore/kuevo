@@ -46,8 +46,7 @@ export async function GET(req: Request) {
   const peopleApi = google.people({ version: 'v1', auth: oauth2Client })
 
   try {
-    // The People API searchContacts might not be available - use connections list instead
-    // Get all contacts and filter client-side
+    // Fetch all contacts and filter client-side
     console.log('[contacts/search] fetching connections with query:', query)
     const res = await peopleApi.people.connections.list({
       resourceName: 'people/me',
