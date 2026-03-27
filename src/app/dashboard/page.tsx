@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 import { useRouter } from 'next/navigation'
 import { Toaster, toast } from 'sonner'
-import { GoogleTokenSaver } from '@/components/GoogleTokenSaver'
 import type { User } from '@supabase/supabase-js'
 
 interface PageItem {
@@ -126,7 +125,6 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Toaster position="bottom-right" />
-      <GoogleTokenSaver />
 
       {/* Nav */}
       <nav className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
