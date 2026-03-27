@@ -95,11 +95,21 @@ export async function GET(req: Request) {
         const headers = full.data.payload?.headers || []
         const parseEmailHeader = (header: string) => {
           // Parse "Name <email@domain.com>" or just "email@domain.com"
-          const match = header.match(/^([^<]*?)\s*<([^>]+)>|^([^<]+)$/)
+          const match = header.match(/^"?([^"<]*)"?\s*<([^>]+)>|^([^<\s]+@[^<\s]+)/)
           if (match) {
-            const name = (match[1] || match[3] || '').trim()
-            const email = match[2] || match[3]
-            return { name, email }
+            let name = match[1] || ''
+            let email = match[2] || match[3] || ''
+            
+            // Clean up name
+            name = name
+              .trim()
+              .replace(/^["']|["']$/g, '') // Remove quotes
+              .replace(/\s+via\s+.*$/i, '') // Remove "via ..." suffixes
+            
+            // Only accept if we have a valid email
+            if (email && email.includes('@')) {
+              return { name: name || email.split('@')[0], email }
+            }
           }
           return null
         }
@@ -123,11 +133,18 @@ export async function GET(req: Request) {
 
     // Filter email contacts by query and add to results
     for (const [, contact] of emailContactMap) {
-      if ((contact.name?.toLowerCase().includes(query.toLowerCase()) || 
+      // Only add if name looks real (not a service email or just domain)
+      const isRealName = contact.name && 
+        contact.name.length > 2 && 
+        !contact.name.includes('@') &&
+        !['noreply', 'no-reply', 'donotreply', 'support', 'info', 'hello', 'contact'].includes(contact.name.toLowerCase())
+      
+      if (isRealName && 
+          (contact.name?.toLowerCase().includes(query.toLowerCase()) || 
            contact.email?.toLowerCase().includes(query.toLowerCase())) &&
           !contacts.find(c => c.email === contact.email)) {
         console.log('[contacts/search] found email contact:', contact)
-        contacts.push({ name: contact.name || contact.email, email: contact.email, company: '', source: 'google' })
+        contacts.push({ name: contact.name, email: contact.email, company: '', source: 'google' })
       }
     }
   } catch (e) {
