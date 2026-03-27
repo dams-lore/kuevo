@@ -47,34 +47,39 @@ export async function GET(req: Request) {
 
   try {
     // Search in regular contacts
+    console.log('[contacts/search] searching contacts with query:', query)
     const res = await peopleApi.people.searchContacts({
       query,
       readMask: 'names,emailAddresses,organizations',
       pageSize: 10,
     })
 
+    console.log('[contacts/search] people API results:', res.data.results?.length || 0, 'contacts')
     for (const person of res.data.results || []) {
       const p = person.person
       if (!p) continue
       const name = p.names?.[0]?.displayName || ''
       const email = p.emailAddresses?.[0]?.value || ''
       const company = p.organizations?.[0]?.name || ''
+      console.log('[contacts/search] found contact:', { name, email, company })
       if (name || email) {
         contacts.push({ name, email, company, source: 'google' })
       }
     }
   } catch (e) {
-    console.error('[contacts/search] people API error:', e)
+    console.error('[contacts/search] people API error:', e instanceof Error ? e.message : String(e))
   }
 
   // Also search otherContacts if results < 5
   if (contacts.length < 5) {
     try {
+      console.log('[contacts/search] searching otherContacts...')
       const res = await peopleApi.otherContacts.search({
         query,
         readMask: 'names,emailAddresses,organizations',
         pageSize: 5,
       })
+      console.log('[contacts/search] otherContacts API results:', res.data.results?.length || 0)
       for (const person of res.data.results || []) {
         const p = person.person
         if (!p) continue
@@ -86,9 +91,10 @@ export async function GET(req: Request) {
         }
       }
     } catch (e) {
-      console.error('[contacts/search] otherContacts error:', e)
+      console.error('[contacts/search] otherContacts error:', e instanceof Error ? e.message : String(e))
     }
   }
 
+  console.log('[contacts/search] returning', contacts.length, 'contacts')
   return NextResponse.json({ contacts: contacts.slice(0, 8) })
 }
