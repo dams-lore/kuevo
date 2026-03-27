@@ -72,86 +72,10 @@ export async function GET(req: Request) {
     console.error('[contacts/search] people API error:', e instanceof Error ? e.message : String(e))
   }
 
-  // Also extract contacts from recent emails (sender/recipient names)
-  try {
-    console.log('[contacts/search] fetching recent emails for contact extraction...')
-    const emailRes = await gmail.users.messages.list({
-      userId: 'me',
-      maxResults: 30,
-    })
-
-    const emailContactMap = new Map<string, { name: string; email: string }>()
-
-    for (const msg of emailRes.data.messages || []) {
-      try {
-        const full = await gmail.users.messages.get({
-          userId: 'me',
-          id: msg.id!,
-          format: 'full',
-        })
-
-        // Get headers safely
-        const headers = full.data.payload?.headers || []
-        const getHeader = (name: string) => headers.find(h => h.name === name)?.value || ''
-        
-        const fromHeader = getHeader('From')
-        const toHeader = getHeader('To')
-        
-        // Simple email parsing: extract "Name <email@domain.com>" or just "email@domain.com"
-        const extractEmails = (headerStr: string) => {
-          if (!headerStr) return []
-          const results = []
-          // Match patterns like: "John Doe" <john@example.com> or john@example.com or john.doe@example.com
-          const emailRegex = /([^<>"]*?)\s*<([^>]+@[^>]+)>|([a-z0-9._%+-]+@[a-z0-9.-]+)/gi
-          let match
-          while ((match = emailRegex.exec(headerStr)) !== null) {
-            let name = (match[1] || match[3] || '').trim()
-            let email = match[2] || match[3]
-            if (email && email.includes('@')) {
-              results.push({ name, email: email.toLowerCase() })
-            }
-          }
-          return results
-        }
-
-        const fromEmails = extractEmails(fromHeader)
-        const toEmails = extractEmails(toHeader)
-        
-        console.log('[contacts/search] extracted from email:', { fromEmails, toEmails })
-
-        // Add all extracted emails to map
-        for (const contact of [...fromEmails, ...toEmails]) {
-          if (!emailContactMap.has(contact.email)) {
-            // Use name if available, otherwise extract from email prefix
-            const finalName = contact.name || contact.email.split('@')[0]
-            emailContactMap.set(contact.email, { name: finalName, email: contact.email })
-          }
-        }
-      } catch (e) {
-        console.error('[contacts/search] error processing message:', e)
-      }
-    }
-
-    console.log('[contacts/search] total email contacts extracted:', emailContactMap.size)
-
-    // Filter email contacts by query and add to results
-    for (const [, contact] of emailContactMap) {
-      // Skip service emails
-      const serviceEmails = ['noreply', 'no-reply', 'donotreply', 'support', 'info', 'hello', 'contact', 'notifications', 'alerts']
-      const emailPrefix = contact.email.split('@')[0].toLowerCase()
-      const isServiceEmail = serviceEmails.some(s => emailPrefix.includes(s))
-      
-      if (!isServiceEmail &&
-          (contact.name?.toLowerCase().includes(query.toLowerCase()) || 
-           contact.email?.toLowerCase().includes(query.toLowerCase())) &&
-          !contacts.find(c => c.email === contact.email)) {
-        console.log('[contacts/search] adding email contact:', contact)
-        contacts.push({ name: contact.name, email: contact.email, company: '', source: 'google' })
-      }
-    }
-  } catch (e) {
-    console.error('[contacts/search] email extraction error:', e instanceof Error ? e.message : String(e))
-  }
+  // TODO: Email-based contact extraction disabled for now
+  // Reason: Gmail API full message format is slow, header parsing is complex
+  // Will re-implement with batch processing + caching in future version
+  console.log('[contacts/search] email extraction disabled (Gmail API optimization needed)')
 
   console.log('[contacts/search] returning', contacts.length, 'contacts')
   return NextResponse.json({ contacts: contacts.slice(0, 8) })
