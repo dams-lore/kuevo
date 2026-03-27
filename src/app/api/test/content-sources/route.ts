@@ -26,7 +26,13 @@ export async function GET() {
       .eq('provider', 'google')
       .single()
 
-    const testResults = {
+    const testResults: {
+      user_id: string
+      google_connected: boolean
+      external_sources_count: number
+      test_passed: boolean
+      warnings: string[]
+    } = {
       user_id: session.user.id,
       google_connected: !!integration?.access_token,
       external_sources_count: 0,
