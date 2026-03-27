@@ -205,10 +205,16 @@ export async function POST(req: Request) {
 
     let allFiles: any[] = []
 
+    // Invoice/payroll/contract exclusion keywords (case insensitive via Drive API)
+    const invoiceKeywords = ['facture', 'invoice', 'payroll', 'salary', 'contrat', 'paie', 'bulletin']
+    const invoiceExclusions = invoiceKeywords
+      .map(k => `and not name contains "${k}"`)
+      .join(' ')
+
     // Search by email topics first (most relevant)
     for (const topic of uniqueTopics) {
       if (topic) {
-        const topicQuery = `name contains '${topic}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions}`
+        const topicQuery = `name contains '${topic}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions} ${invoiceExclusions}`
         console.log('[google/context] drive topic query:', topicQuery)
         
         try {
@@ -229,7 +235,7 @@ export async function POST(req: Request) {
 
     // If not enough results from topics, search by company name
     if (allFiles.length < 3) {
-      const companyQuery = `name contains '${company}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions}`
+      const companyQuery = `name contains '${company}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions} ${invoiceExclusions}`
       console.log('[google/context] fallback company search:', companyQuery)
 
       const filesRes = await drive.files.list({

@@ -2,51 +2,39 @@
 
 import { useState, useEffect } from 'react'
 import { supabaseBrowser } from '@/lib/supabase-browser'
+import { useRouter } from 'next/navigation'
+import { Toaster, toast } from 'sonner'
 
 interface Block {
   title: string
   url: string
 }
 
-interface Integration {
-  id: string
-  provider: string
-}
-
 export default function CreatePage() {
-  const [prospectName, setProspectName] = useState('')
-  const [company, setCompany] = useState('')
-  const [prospectEmail, setProspectEmail] = useState('')
-  const [introMessage, setIntroMessage] = useState('')
-  const [blocks, setBlocks] = useState<Block[]>([{ title: '', url: '' }])
-  const [loading, setLoading] = useState(false)
-  const [generating, setGenerating] = useState(false)
-  const [fetchingContext, setFetchingContext] = useState(false)
-  const [result, setResult] = useState<{ slug: string; url: string } | null>(null)
-  const [error, setError] = useState('')
-  const [copied, setCopied] = useState(false)
+  const router = useRouter()
+  const [step, setStep] = useState(1)
   const [googleConnected, setGoogleConnected] = useState(false)
   const [checkingIntegration, setCheckingIntegration] = useState(true)
 
-  // Email modal state
-  const [showEmailModal, setShowEmailModal] = useState(false)
-  const [emailTo, setEmailTo] = useState('')
-  const [emailSubject, setEmailSubject] = useState('')
-  const [emailBody, setEmailBody] = useState('')
-  const [sendingEmail, setSendingEmail] = useState(false)
-  const [emailSent, setEmailSent] = useState(false)
-  const [emailError, setEmailError] = useState('')
-
-  // Contact autocomplete state
+  // Step 1: Contact info
+  const [prospectName, setProspectName] = useState('')
+  const [company, setCompany] = useState('')
+  const [prospectEmail, setProspectEmail] = useState('')
   const [contactSuggestions, setContactSuggestions] = useState<Array<{name: string; email: string; company: string}>>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [contactSearchLoading, setContactSearchLoading] = useState(false)
 
-  // Blog URL state
-  const [blogUrl, setBlogUrl] = useState('')
-  const [fetchingBlogArticles, setFetchingBlogArticles] = useState(false)
+  // Step 2: Intro message
+  const [introMessage, setIntroMessage] = useState('')
+  const [generatingIntro, setGeneratingIntro] = useState(false)
 
+  // Step 3: Content
+  const [blocks, setBlocks] = useState<Block[]>([{ title: '', url: '' }])
+  const [fetchingContext, setFetchingContext] = useState(false)
 
+  // Step 4: Actions
+  const [creating, setCreating] = useState(false)
+  const [sendingEmail, setSendingEmail] = useState(false)
 
   useEffect(() => {
     async function checkIntegration() {
@@ -66,29 +54,36 @@ export default function CreatePage() {
     checkIntegration()
   }, [])
 
-  function addBlock() {
-    if (blocks.length < 5) {
-      setBlocks([...blocks, { title: '', url: '' }])
+  async function handleContactSearch(val: string) {
+    setProspectName(val)
+    if (val.length >= 2) {
+      setContactSearchLoading(true)
+      try {
+        console.log('[create] searching contacts for:', val)
+        const res = await fetch(`/api/contacts/search?q=${encodeURIComponent(val)}`)
+        const data = await res.json()
+        if (data.contacts?.length > 0) {
+          setContactSuggestions(data.contacts)
+          setShowSuggestions(true)
+        } else {
+          setShowSuggestions(false)
+        }
+      } catch (e) {
+        console.error('[create] autocomplete error:', e)
+      } finally {
+        setContactSearchLoading(false)
+      }
+    } else {
+      setShowSuggestions(false)
     }
-  }
-
-  function removeBlock(index: number) {
-    setBlocks(blocks.filter((_, i) => i !== index))
-  }
-
-  function updateBlock(index: number, field: 'title' | 'url', value: string) {
-    const updated = [...blocks]
-    updated[index][field] = value
-    setBlocks(updated)
   }
 
   async function generateIntro() {
-    if (!prospectName || !company) {
-      setError('Please enter contact name and company first')
+    if (!company || !prospectName) {
+      toast.error('Please fill in contact name and company first')
       return
     }
-    setGenerating(true)
-    setError('')
+    setGeneratingIntro(true)
     try {
       const res = await fetch('/api/generate-intro', {
         method: 'POST',
@@ -96,33 +91,36 @@ export default function CreatePage() {
         body: JSON.stringify({ prospect_name: prospectName, company }),
       })
       const data = await res.json()
-      if (data.intro) setIntroMessage(data.intro)
-      else setError(data.error || 'Failed to generate intro')
-    } catch {
-      setError('Failed to generate intro')
+      if (data.intro) {
+        setIntroMessage(data.intro)
+        toast.success('Intro generated!')
+      } else {
+        toast.error(data.error || 'Failed to generate intro')
+      }
+    } catch (e) {
+      toast.error('Error generating intro')
     } finally {
-      setGenerating(false)
+      setGeneratingIntro(false)
     }
   }
 
   async function fetchGoogleContext() {
     if (!prospectName || !company) {
-      setError('Please enter contact name and company first')
+      toast.error('Please fill in contact name and company first')
       return
     }
     setFetchingContext(true)
-    setError('')
     try {
       const res = await fetch('/api/google/context', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          prospect_name: prospectName, 
-          company,
-        }),
+        body: JSON.stringify({ prospect_name: prospectName, company }),
       })
       const data = await res.json()
-      if (data.intro) setIntroMessage(data.intro)
+      if (data.intro) {
+        setIntroMessage(data.intro)
+        toast.success('Context fetched from Gmail & Drive!')
+      }
       if (data.suggested_blocks?.length > 0) {
         const newBlocks = data.suggested_blocks.slice(0, 5).map((b: Block) => ({
           title: b.title || '',
@@ -130,25 +128,23 @@ export default function CreatePage() {
         }))
         setBlocks(newBlocks)
       }
-      if (data.error) setError(data.error)
-    } catch {
-      setError('Failed to fetch Google context')
+      if (data.error) toast.error(data.error)
+    } catch (e) {
+      toast.error('Error fetching context')
     } finally {
       setFetchingContext(false)
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function createPage(sendEmail: boolean = false) {
     if (!prospectName || !company) {
-      setError('Contact name and company are required')
+      toast.error('Contact name and company are required')
       return
     }
-    setLoading(true)
-    setError('')
 
     const validBlocks = blocks.filter(b => b.title && b.url)
 
+    setCreating(true)
     try {
       const res = await fetch('/api/pages', {
         method: 'POST',
@@ -156,201 +152,53 @@ export default function CreatePage() {
         body: JSON.stringify({
           prospect_name: prospectName,
           company,
-          prospect_email: prospectEmail,
+          prospect_email: prospectEmail || null,
           intro_message: introMessage,
           blocks: validBlocks,
         }),
       })
+
       const data = await res.json()
-      if (data.url) {
-        setResult(data)
-        setEmailTo(prospectEmail)
-        setEmailSubject(`Resources for ${prospectName} at ${company}`)
-        setEmailBody(
-          `Hi ${prospectName},\n\n` +
-          (introMessage ? introMessage + '\n\n' : '') +
-          `I've put together a page with the resources we discussed:\n${data.url}\n\n` +
-          `Let me know if you have any questions!\n\nBest,`
-        )
-      } else {
-        setError(data.error || 'Failed to create page')
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to create page')
+        return
       }
-    } catch {
-      setError('Failed to create page')
-    } finally {
-      setLoading(false)
-    }
-  }
 
-  async function copyLink() {
-    if (result?.url) {
-      await navigator.clipboard.writeText(result.url)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
-  }
+      const pageUrl = `${window.location.origin}/p/${data.slug}`
+      console.log('[create] page created:', pageUrl)
+      toast.success('Page created!')
 
-  async function sendEmail() {
-    setSendingEmail(true)
-    setEmailError('')
-    try {
-      const res = await fetch('/api/email/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: emailTo, subject: emailSubject, body: emailBody }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        setEmailSent(true)
-        setTimeout(() => setShowEmailModal(false), 2000)
-      } else if (data.error === 'Gmail not connected') {
-        // Fallback to mailto
-        const mailtoUrl = `mailto:${encodeURIComponent(emailTo)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`
-        window.open(mailtoUrl, '_blank')
-        setShowEmailModal(false)
+      // Copy URL to clipboard
+      navigator.clipboard.writeText(pageUrl)
+      toast.success('URL copied to clipboard!')
+
+      if (sendEmail && googleConnected && prospectEmail) {
+        // TODO: Open email composer with pre-filled message
+        const subject = `Resources for ${prospectName} at ${company}`
+        const body = `Hi ${prospectName},\n\nHere are the resources we discussed:\n\n${pageUrl}\n\nFeel free to review at your pace.\n\nBest regards`
+        window.location.href = `mailto:${prospectEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
       } else {
-        setEmailError(data.error || 'Failed to send email')
+        router.push('/dashboard')
       }
-    } catch {
-      setEmailError('Network error')
+    } catch (e) {
+      toast.error('Error creating page')
     } finally {
-      setSendingEmail(false)
+      setCreating(false)
     }
   }
 
-  if (result) {
+  if (checkingIntegration) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="w-full max-w-md text-center">
-          <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-sm">
-            <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Page created! 🎉</h2>
-            <p className="text-gray-500 text-sm mb-6">Share this link with {prospectName}</p>
-
-            <div className="bg-gray-50 border border-gray-200 rounded font-mono text-sm text-gray-800 p-4 mb-4 break-all">
-              {result.url}
-            </div>
-
-            <button
-              onClick={copyLink}
-              className="w-full py-3 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-medium rounded-lg transition mb-3"
-            >
-              {copied ? '✓ Copied!' : '📋 Copy link'}
-            </button>
-
-            <button
-              onClick={() => setShowEmailModal(true)}
-              className="w-full py-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium rounded-xl transition flex items-center justify-center gap-2 mb-3"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-              Send email
-            </button>
-
-            <button
-              onClick={() => { setResult(null); setProspectName(''); setCompany(''); setProspectEmail(''); setIntroMessage(''); setBlocks([{ title: '', url: '' }]); setEmailSent(false) }}
-              className="w-full py-3 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 font-medium rounded-lg transition"
-            >
-              Create another
-            </button>
-          </div>
-        </div>
-
-        {showEmailModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="text-lg font-semibold text-gray-900">Send email</h3>
-                <button onClick={() => setShowEmailModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
-              </div>
-
-              {emailSent ? (
-                <div className="text-center py-6">
-                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <p className="text-gray-900 font-semibold">Email sent ✓</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
-                    <input
-                      type="email"
-                      value={emailTo}
-                      onChange={e => setEmailTo(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-                    <input
-                      type="text"
-                      value={emailSubject}
-                      onChange={e => setEmailSubject(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
-                    <textarea
-                      value={emailBody}
-                      onChange={e => setEmailBody(e.target.value)}
-                      rows={8}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
-                    />
-                  </div>
-
-                  {emailError && <p className="text-red-500 text-sm">{emailError}</p>}
-
-                  <div className="flex gap-3 pt-1">
-                    <button
-                      onClick={() => setShowEmailModal(false)}
-                      className="flex-1 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition text-sm"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={sendEmail}
-                      disabled={sendingEmail || !emailTo}
-                      className="flex-1 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 disabled:opacity-50 text-white font-medium rounded-lg transition text-sm flex items-center justify-center gap-2"
-                    >
-                      {sendingEmail ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          Sending...
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                          </svg>
-                          Send via Gmail
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  {!googleConnected && (
-                    <p className="text-xs text-gray-400 text-center">Gmail not connected — will open in your mail client instead</p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-500">Loading...</div>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Toaster position="bottom-right" />
+
       {/* Nav */}
       <nav className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <a href="/" className="text-xl font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
@@ -362,86 +210,34 @@ export default function CreatePage() {
       </nav>
 
       <main className="max-w-2xl mx-auto px-6 py-10">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Create a page</h1>
-        <p className="text-gray-500 text-sm mb-8">Build a personalized link page for your prospect</p>
-
-        {/* Google Integration Banner */}
-        {!checkingIntegration && (
-          <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-              </svg>
-              {googleConnected ? (
-                <span className="text-green-600 text-sm font-medium">✓ Gmail & Drive connected</span>
-              ) : (
-                <span className="text-gray-600 text-sm">Not connected</span>
-              )}
-            </div>
-            {googleConnected && (
-              <button
-                onClick={fetchGoogleContext}
-                disabled={fetchingContext || !company}
-                className="text-xs px-3 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg transition disabled:opacity-50"
-              >
-                {fetchingContext ? 'Fetching...' : '✨ Fetch context'}
-              </button>
-            )}
-            {!googleConnected && (
-              <a
-                href="/settings"
-                className="text-xs px-3 py-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg transition inline-block"
-              >
-                Connect Google
-              </a>
-            )}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Create a sharing page</h1>
+          <p className="text-gray-500">Step {step} of 4</p>
+          
+          {/* Progress bar */}
+          <div className="mt-4 h-1 bg-gray-200 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-gradient-to-r from-violet-600 to-indigo-600 transition-all"
+              style={{ width: `${(step / 4) * 100}%` }}
+            ></div>
           </div>
-        )}
+        </div>
 
-        {/* Main Form */}
         <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-sm">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+          {/* Step 1: Contact Info */}
+          {step === 1 && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">Contact information</h2>
+              </div>
+
+              {/* Contact Name with Autocomplete */}
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Contact name *</label>
                 <input
                   type="text"
                   value={prospectName}
-                  onChange={async (e) => {
-                    const val = e.target.value
-                    setProspectName(val)
-                    if (val.length >= 2) {
-                      setContactSearchLoading(true)
-                      try {
-                        console.log('[create] searching contacts for:', val)
-                        const res = await fetch(`/api/contacts/search?q=${encodeURIComponent(val)}`)
-                        console.log('[create] contact search response status:', res.status)
-                        const data = await res.json()
-                        console.log('[create] contact search data:', data)
-                        // Always show suggestions if we got results, even if there's an error
-                        if (data.contacts && data.contacts.length > 0) {
-                          console.log('[create] found', data.contacts.length, 'contacts')
-                          setContactSuggestions(data.contacts)
-                          setShowSuggestions(true)
-                        } else {
-                          console.log('[create] no contacts found')
-                          setContactSuggestions([])
-                          setShowSuggestions(false)
-                        }
-                      } catch (e) {
-                        console.error('[create] autocomplete fetch error:', e)
-                        setContactSuggestions([])
-                      } finally {
-                        setContactSearchLoading(false)
-                      }
-                    } else {
-                      setShowSuggestions(false)
-                      setContactSuggestions([])
-                    }
-                  }}
+                  onChange={(e) => handleContactSearch(e.target.value)}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                   required
                   placeholder="Sarah Johnson"
@@ -458,10 +254,9 @@ export default function CreatePage() {
                         type="button"
                         onMouseDown={() => {
                           setProspectName(c.name)
-                          if (c.email) setProspectEmail(c.email)
-                          if (c.company) setCompany(c.company)
+                          setProspectEmail(c.email)
+                          setCompany(c.company)
                           setShowSuggestions(false)
-                          setContactSuggestions([])
                         }}
                         className="w-full text-left px-3 py-2 hover:bg-gray-50 transition border-b border-gray-100 last:border-0"
                       >
@@ -472,12 +267,11 @@ export default function CreatePage() {
                         </div>
                       </button>
                     ))}
-                    {!contactSearchLoading && contactSuggestions.length === 0 && prospectName.length >= 2 && (
-                      <div className="px-3 py-2 text-xs text-gray-400">No contacts found — fill in manually</div>
-                    )}
                   </div>
                 )}
               </div>
+
+              {/* Company */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Company *</label>
                 <input
@@ -489,155 +283,204 @@ export default function CreatePage() {
                   className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
                 />
               </div>
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Prospect email <span className="text-gray-400 font-normal">(optional — for sending)</span>
-              </label>
-              <input
-                type="email"
-                value={prospectEmail}
-                onChange={(e) => setProspectEmail(e.target.value)}
-                placeholder="sarah@acmecorp.com"
-                className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition text-sm"
-              />
-            </div>
+              {/* Email (Optional) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Contact email <span className="text-gray-400 font-normal">(optional — for sending)</span>
+                </label>
+                <input
+                  type="email"
+                  value={prospectEmail}
+                  onChange={(e) => setProspectEmail(e.target.value)}
+                  placeholder="sarah@acmecorp.com"
+                  className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition text-sm"
+                />
+              </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-700">Intro message</label>
+              {/* Google Status */}
+              {!googleConnected && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <p className="text-sm text-amber-800">
+                    <span className="font-medium">Gmail & Drive not connected.</span> Go to <a href="/settings" className="underline">settings</a> to connect Google and enable email/file features.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 2: Intro Message */}
+          {step === 2 && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-1">Page intro</h2>
+                <p className="text-sm text-gray-500">Subject line + one engaging punchline</p>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">Intro message</label>
+                  <div className="flex gap-2">
+                    {googleConnected && (
+                      <button
+                        onClick={fetchGoogleContext}
+                        disabled={fetchingContext || !company}
+                        className="text-xs px-3 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg transition disabled:opacity-50"
+                      >
+                        {fetchingContext ? 'Fetching...' : '✨ Fetch from Gmail'}
+                      </button>
+                    )}
+                    <button
+                      onClick={generateIntro}
+                      disabled={generatingIntro || !company}
+                      className="text-xs px-3 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg transition disabled:opacity-50"
+                    >
+                      {generatingIntro ? 'Generating...' : '✨ Generate with AI'}
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  rows={5}
+                  value={introMessage}
+                  onChange={(e) => setIntroMessage(e.target.value)}
+                  placeholder="Write a personalized message for your prospect..."
+                  className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition resize-none"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Content */}
+          {step === 3 && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-1">Content links</h2>
+                <p className="text-sm text-gray-500">Files and resources to share</p>
+              </div>
+
+              {googleConnected && (
                 <button
-                  type="button"
-                  onClick={generateIntro}
-                  disabled={generating}
-                  className="text-xs px-3 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg transition disabled:opacity-50"
+                  onClick={fetchGoogleContext}
+                  disabled={fetchingContext || !company}
+                  className="w-full px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium text-sm"
                 >
-                  {generating ? 'Generating...' : '✨ Generate with AI'}
+                  {fetchingContext ? 'Fetching...' : '📁 Fetch content from Drive'}
                 </button>
-              </div>
-              <textarea
-                value={introMessage}
-                onChange={(e) => setIntroMessage(e.target.value)}
-                rows={4}
-                placeholder="Write a personalized message for your prospect..."
-                className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition resize-none"
-              />
-            </div>
+              )}
 
-            {/* Content Blocks */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <label className="block text-sm font-medium text-gray-700">Content links</label>
-                <span className="text-xs text-gray-400">{blocks.length}/5</span>
-              </div>
               <div className="space-y-3">
-                {blocks.map((block, index) => (
-                  <div key={index} className="flex gap-2 items-start">
+                {blocks.map((block, i) => (
+                  <div key={i} className="flex gap-2 items-start">
                     <div className="flex-1 grid grid-cols-2 gap-2">
                       <input
                         type="text"
-                        value={block.title}
-                        onChange={(e) => updateBlock(index, 'title', e.target.value)}
                         placeholder="Title"
+                        value={block.title}
+                        onChange={(e) => {
+                          const updated = [...blocks]
+                          updated[i].title = e.target.value
+                          setBlocks(updated)
+                        }}
                         className="px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition text-sm"
                       />
                       <input
                         type="url"
-                        value={block.url}
-                        onChange={(e) => updateBlock(index, 'url', e.target.value)}
                         placeholder="https://..."
+                        value={block.url}
+                        onChange={(e) => {
+                          const updated = [...blocks]
+                          updated[i].url = e.target.value
+                          setBlocks(updated)
+                        }}
                         className="px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition text-sm"
                       />
                     </div>
                     {blocks.length > 1 && (
                       <button
+                        onClick={() => setBlocks(blocks.filter((_, idx) => idx !== i))}
                         type="button"
-                        onClick={() => removeBlock(index)}
-                        className="w-9 h-9 flex items-center justify-center text-gray-400 hover:text-red-500 transition mt-0.5 text-lg"
+                        className="text-gray-400 hover:text-red-600 transition px-2 py-2.5"
                       >
-                        ×
+                        ✕
                       </button>
                     )}
                   </div>
                 ))}
               </div>
+
               {blocks.length < 5 && (
                 <button
+                  onClick={() => setBlocks([...blocks, { title: '', url: '' }])}
                   type="button"
-                  onClick={addBlock}
-                  className="mt-3 text-sm text-violet-600 hover:text-violet-800 transition"
+                  className="text-sm text-violet-600 hover:text-violet-800 transition"
                 >
-                  + Add item
+                  + Add another link
                 </button>
               )}
             </div>
+          )}
 
-            {/* Blog URL — optional */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Blog URL <span className="text-gray-400 font-normal">(optional — fetch latest articles)</span>
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="url"
-                  value={blogUrl}
-                  onChange={(e) => setBlogUrl(e.target.value)}
-                  placeholder="https://blog.company.com"
-                  className="flex-1 px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (!blogUrl) {
-                      setError('Please enter a blog URL')
-                      return
-                    }
-                    setFetchingBlogArticles(true)
-                    setError('')
-                    try {
-                      const res = await fetch('/api/blog/articles', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ blog_url: blogUrl }),
-                      })
-                      const data = await res.json()
-                      if (data.articles && data.articles.length > 0) {
-                        // Merge blog articles with existing blocks, cap at 3 total
-                        const blogBlocks = data.articles.slice(0, 3).map((a: { title: string; url: string }) => ({
-                          title: a.title,
-                          url: a.url,
-                        }))
-                        setBlocks(blogBlocks)
-                      } else {
-                        setError(data.error || 'No articles found')
-                      }
-                    } catch {
-                      setError('Failed to fetch blog articles')
-                    } finally {
-                      setFetchingBlogArticles(false)
-                    }
-                  }}
-                  disabled={fetchingBlogArticles || !blogUrl}
-                  className="px-3 py-2.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg transition disabled:opacity-50 font-medium text-sm whitespace-nowrap"
-                >
-                  {fetchingBlogArticles ? 'Fetching...' : 'Fetch articles'}
-                </button>
+          {/* Step 4: Actions */}
+          {step === 4 && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">Ready to share?</h2>
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <p className="text-sm text-gray-700">
+                    <span className="font-medium">{prospectName}</span> at <span className="font-medium">{company}</span>
+                  </p>
+                </div>
               </div>
             </div>
+          )}
 
-            {error && (
-              <p className="text-red-600 text-sm">{error}</p>
+          {/* Navigation Buttons */}
+          <div className="flex gap-3 mt-8 pt-6 border-t border-gray-200">
+            {step > 1 && (
+              <button
+                onClick={() => setStep(step - 1)}
+                className="px-6 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition"
+              >
+                ← Back
+              </button>
             )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 disabled:opacity-50 text-white font-medium rounded-lg transition"
-            >
-              {loading ? 'Creating...' : '🔗 Generate link'}
-            </button>
-          </form>
+            {step < 4 && (
+              <button
+                onClick={() => {
+                  if (step === 1 && (!prospectName || !company)) {
+                    toast.error('Please fill in contact name and company')
+                    return
+                  }
+                  setStep(step + 1)
+                }}
+                className="flex-1 px-6 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-medium rounded-lg transition"
+              >
+                Next →
+              </button>
+            )}
+
+            {step === 4 && (
+              <div className="flex-1 flex gap-3">
+                <button
+                  onClick={() => createPage(false)}
+                  disabled={creating}
+                  className="flex-1 px-6 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+                >
+                  {creating ? '...' : '🔗 Generate link'}
+                </button>
+                {googleConnected && prospectEmail && (
+                  <button
+                    onClick={() => createPage(true)}
+                    disabled={creating || sendingEmail}
+                    className="flex-1 px-6 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-medium rounded-lg transition disabled:opacity-50"
+                  >
+                    {creating || sendingEmail ? '...' : '📧 Generate + Send email'}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>
