@@ -106,6 +106,7 @@ export async function POST(req: Request) {
   // ── Gmail ────────────────────────────────────────────────────────────────
   const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
   const emailSummaries: string[] = []
+  const emailTopics: string[] = [] // Extract keywords/topics for Drive search
 
   try {
     const gmailQuery = buildGmailQuery(domains)
@@ -133,7 +134,23 @@ export async function POST(req: Request) {
         const from = headers.find(h => h.name === 'From')?.value || ''
         const date = headers.find(h => h.name === 'Date')?.value || ''
         const snippet = full.data.snippet || ''
+        
         emailSummaries.push(`Date: ${date}\nFrom: ${from}\nSubject: ${subject}\nSnippet: ${snippet}`)
+        
+        // Extract topics from subject (remove "Re:", "Fwd:", etc.)
+        const cleanSubject = subject
+          .replace(/^(Re|Fwd|FW|Re-Fwd):\s*/gi, '')
+          .replace(/\[.*?\]/g, '') // Remove bracketed text
+          .trim()
+        
+        // Extract keywords (words > 3 chars, not common words)
+        const commonWords = new Set(['the', 'and', 'for', 'with', 'from', 'that', 'this', 'have', 'will', 'your', 'about', 'our', 'new', 'can', 'but', 'just', 'more'])
+        const keywords = cleanSubject
+          .toLowerCase()
+          .split(/\s+/)
+          .filter(w => w.length > 3 && !commonWords.has(w) && /^[a-z0-9]+$/.test(w))
+        
+        emailTopics.push(...keywords)
       } catch (e) {
         console.error('[google/context] error fetching message:', e)
       }
@@ -141,6 +158,9 @@ export async function POST(req: Request) {
   } catch (e) {
     console.error('[google/context] gmail list error:', e)
   }
+
+  const uniqueTopics = [...new Set(emailTopics)].slice(0, 5) // Top 5 unique topics
+  console.log('[google/context] extracted topics:', uniqueTopics)
 
   // ── Drive ────────────────────────────────────────────────────────────────
   const drive = google.drive({ version: 'v3', auth: oauth2Client })
@@ -157,20 +177,44 @@ export async function POST(req: Request) {
       exclusions += ' and not name contains "financial" and not name contains "budget" and not name contains "p&l" and not name contains "expense"'
     }
 
-    // Search by company name as keyword (not by domain)
-    // Try specific search first — NO SPREADSHEETS (security risk)
-    const driveQuery = `name contains '${company}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions}`
-    console.log('[google/context] drive query:', driveQuery)
+    let allFiles: any[] = []
 
-    const filesRes = await drive.files.list({
-      q: driveQuery,
-      fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
-      pageSize: 50,
-      orderBy: 'modifiedTime desc',
-    })
+    // Search by email topics first (most relevant)
+    for (const topic of uniqueTopics) {
+      if (topic) {
+        const topicQuery = `name contains '${topic}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions}`
+        console.log('[google/context] drive topic query:', topicQuery)
+        
+        try {
+          const topicRes = await drive.files.list({
+            q: topicQuery,
+            fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
+            pageSize: 10,
+            orderBy: 'modifiedTime desc',
+          })
+          allFiles = allFiles.concat(topicRes.data.files || [])
+        } catch (e) {
+          console.error('[google/context] topic search error:', e)
+        }
+      }
+    }
 
-    let allFiles = filesRes.data.files || []
-    console.log('[google/context] drive files found with company name:', allFiles.length)
+    console.log('[google/context] drive files found with email topics:', allFiles.length)
+
+    // If not enough results from topics, search by company name
+    if (allFiles.length < 3) {
+      const companyQuery = `name contains '${company}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions}`
+      console.log('[google/context] fallback company search:', companyQuery)
+
+      const filesRes = await drive.files.list({
+        q: companyQuery,
+        fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
+        pageSize: 50,
+        orderBy: 'modifiedTime desc',
+      })
+      allFiles = allFiles.concat(filesRes.data.files || [])
+      console.log('[google/context] drive files found with company name:', filesRes.data.files?.length || 0)
+    }
 
     // If not enough results, do a broader search for recently modified files (NO SPREADSHEETS - security risk)
     if (allFiles.length < 3) {
@@ -219,6 +263,8 @@ export async function POST(req: Request) {
     ? driveFiles.map(f => `- ${f.name} (${f.webViewLink})`).join('\n')
     : 'No relevant Drive files found.'
 
+  const topicsStr = uniqueTopics.length > 0 ? `Topics discussed: ${uniqueTopics.join(', ')}` : 'No specific topics extracted'
+
   const prompt = `You are a sales follow-up expert helping prepare a personalized sharing page.
 
 PROSPECT: ${prospect_name} at ${company}
@@ -226,23 +272,27 @@ PROSPECT: ${prospect_name} at ${company}
 EMAIL CONTEXT:
 ${emailContext}
 
+KEY TOPICS FROM EMAILS: ${topicsStr}
+
 AVAILABLE FILES:
 ${driveContext}
 
-TASK: Generate a professional yet personal intro message for a follow-up page, plus suggest the most relevant files.
+TASK: Generate a professional yet personal intro message for a follow-up page, plus suggest the most relevant files based on the email topics discussed.
 
 INTRO MESSAGE FORMAT (exactly 4 sentences max):
-1. Personalized opener mentioning the prospect/company (reference something from emails if available)
-2. Clear statement of what's being shared and why it's relevant
-3. Brief value statement
+1. Personalized opener mentioning the prospect/company and referencing a specific topic from emails
+2. Clear statement of what's being shared and why it's relevant to their needs
+3. Brief value statement connecting to email topics
 4. Soft CTA (e.g., "Feel free to review at your pace")
 
 RULES:
 - Max 4 sentences total
 - Professional but warm tone
-- Reference specific topics from emails when available
-- Never generic — always personalized
+- MUST reference at least one specific topic from the email context above
+- MUST reference specific file names that match the topics discussed
+- Never generic — always hyper-personalized based on actual email content
 - Only suggest files with valid URLs (webViewLink)
+- Prioritize files whose names match the topics discussed in emails
 
 Respond ONLY with valid JSON, no markdown:
 {
