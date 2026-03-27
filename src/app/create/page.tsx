@@ -140,10 +140,28 @@ export default function CreatePage() {
     }
     setGeneratingIntro(true)
     try {
+      // First try to fetch emails for language detection
+      let emailContext = ''
+      if (googleConnected) {
+        try {
+          const emailRes = await fetch('/api/google/context', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prospect_name: prospectName, company }),
+          })
+          const emailData = await emailRes.json()
+          if (emailData.email_subjects) {
+            emailContext = emailData.email_subjects
+          }
+        } catch (e) {
+          console.log('[create] couldnt fetch email context for language detection')
+        }
+      }
+
       const res = await fetch('/api/generate-intro', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prospect_name: prospectName, company }),
+        body: JSON.stringify({ prospect_name: prospectName, company, email_context: emailContext }),
       })
       const data = await res.json()
       if (data.intro) {
