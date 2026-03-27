@@ -14,6 +14,7 @@ export default function CreatePage() {
   const router = useRouter()
   const [googleConnected, setGoogleConnected] = useState(false)
   const [checkingIntegration, setCheckingIntegration] = useState(true)
+  const [successUrl, setSuccessUrl] = useState<string | null>(null)
 
   // Section 1: Contact info
   const [prospectName, setProspectName] = useState('')
@@ -164,18 +165,13 @@ export default function CreatePage() {
 
       const pageUrl = `${window.location.origin}/p/${data.slug}`
       console.log('[create] page created:', pageUrl)
+      setSuccessUrl(pageUrl)
       toast.success('Page created!')
-
-      // Copy URL to clipboard
-      navigator.clipboard.writeText(pageUrl)
-      toast.success('URL copied to clipboard!')
 
       if (sendEmail && googleConnected && prospectEmail) {
         const subject = `Resources for ${prospectName} at ${company}`
         const body = `Hi ${prospectName},\n\nHere are the resources we discussed:\n\n${pageUrl}\n\nFeel free to review at your pace.\n\nBest regards`
         window.location.href = `mailto:${prospectEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-      } else {
-        router.push('/dashboard')
       }
     } catch (e) {
       toast.error('Error creating page')
@@ -189,6 +185,49 @@ export default function CreatePage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-gray-500">Loading...</div>
+      </div>
+    )
+  }
+
+  if (successUrl) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6">
+        <Toaster position="bottom-right" />
+        <div className="text-center max-w-md">
+          <div className="text-6xl mb-4">🎉</div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Page created!</h1>
+          <p className="text-gray-600 mb-6">Your personalized sharing page is ready to send</p>
+          
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+            <p className="text-sm text-gray-500 mb-2">Share this link:</p>
+            <p className="font-mono text-sm text-gray-900 break-all">{successUrl}</p>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(successUrl)
+                toast.success('Link copied!')
+              }}
+              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-semibold rounded-lg transition"
+            >
+              📋 Copy link
+            </button>
+            <button
+              onClick={() => setSuccessUrl(null)}
+              className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition"
+            >
+              Create another
+            </button>
+          </div>
+
+          <a
+            href="/dashboard"
+            className="block text-sm text-violet-600 hover:text-violet-800 mt-6"
+          >
+            ← Back to dashboard
+          </a>
+        </div>
       </div>
     )
   }
