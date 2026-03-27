@@ -13,10 +13,14 @@ export async function POST(req: Request) {
 
   const message = await anthropic.messages.create({
     model: 'claude-opus-4-5',
-    max_tokens: 300,
+    max_tokens: 150,
     messages: [{
       role: 'user',
-      content: `Write a short, personalized intro message (2-3 sentences, friendly but professional) for a sales follow-up page sent to ${prospect_name} from ${company}. The page contains resources shared after a sales call. No subject line, no greeting — just the body text. Start directly with the value. Respond in English.`
+      content: `Generate a 2-line intro message for a sales follow-up page:
+Line 1: Subject line — short, punchy, like an email subject (max 10 words)
+Line 2: One engaging punchline — what's in it for ${prospect_name} at ${company} (max 20 words)
+
+Respond in English. Output ONLY these 2 lines, nothing else.`
     }]
   })
 

@@ -299,42 +299,33 @@ export async function POST(req: Request) {
   const detectedLanguage = detectLanguage(emailSummaries)
   console.log('[google/context] detected language:', detectedLanguage)
 
-  const prompt = `You are a sales follow-up expert helping prepare a personalized sharing page.
-IMPORTANT: Respond in ${detectedLanguage}. The emails below are in ${detectedLanguage}.
+  const prompt = `Generate a 2-line intro message in ${detectedLanguage} for a sales follow-up page.
 
 PROSPECT: ${prospect_name} at ${company}
 
-EMAIL CONTEXT:
-${emailContext}
-
-KEY TOPICS FROM EMAILS: ${topicsStr}
+EMAIL TOPICS: ${topicsStr}
 
 AVAILABLE FILES:
 ${driveContext}
 
-TASK: Generate a professional yet personal intro message for a follow-up page, plus suggest the most relevant files based on the email topics discussed.
-
-INTRO MESSAGE FORMAT (exactly 4 sentences max):
-1. Personalized opener mentioning the prospect/company and referencing a specific topic from emails
-2. Clear statement of what's being shared and why it's relevant to their needs
-3. Brief value statement connecting to email topics
-4. Soft CTA (e.g., "Feel free to review at your pace")
+FORMAT (exactly 2 lines, no more):
+Line 1: Subject line — short, punchy, like an email subject (max 10 words)
+Line 2: One engaging punchline referencing the email topics (max 20 words)
 
 RULES:
-- Max 4 sentences total
+- Only output these 2 lines, nothing else
+- Reference at least one topic from the emails
+- Respond in ${detectedLanguage}
 - Professional but warm tone
-- MUST reference at least one specific topic from the email context above
-- MUST reference specific file names that match the topics discussed
-- Never generic — always hyper-personalized based on actual email content
-- Only suggest files with valid URLs (webViewLink)
-- Prioritize files whose names match the topics discussed in emails
+
+Also suggest up to 3 relevant files that match the topics discussed.
 
 Respond ONLY with valid JSON, no markdown:
 {
-  "intro": "Personalized intro message here",
+  "intro": "Line 1\\nLine 2",
   "suggested_blocks": [
-    {"title": "File Name", "url": "https://drive.google.com/..."},
-    {"title": "File Name", "url": "https://drive.google.com/..."}
+    {"title": "File Name", "url": "https://..."},
+    {"title": "File Name", "url": "https://..."}
   ]
 }`
 
