@@ -42,6 +42,10 @@ export default function CreatePage() {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [contactSearchLoading, setContactSearchLoading] = useState(false)
 
+  // Blog URL state
+  const [blogUrl, setBlogUrl] = useState('')
+  const [fetchingBlogArticles, setFetchingBlogArticles] = useState(false)
+
   useEffect(() => {
     async function checkIntegration() {
       const { data: { session } } = await supabaseBrowser.auth.getSession()
@@ -555,6 +559,59 @@ export default function CreatePage() {
                   + Add item
                 </button>
               )}
+            </div>
+
+            {/* Blog URL — optional */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Blog URL <span className="text-gray-400 font-normal">(optional — fetch latest articles)</span>
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={blogUrl}
+                  onChange={(e) => setBlogUrl(e.target.value)}
+                  placeholder="https://blog.company.com"
+                  className="flex-1 px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!blogUrl) {
+                      setError('Please enter a blog URL')
+                      return
+                    }
+                    setFetchingBlogArticles(true)
+                    setError('')
+                    try {
+                      const res = await fetch('/api/blog/articles', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ blog_url: blogUrl }),
+                      })
+                      const data = await res.json()
+                      if (data.articles && data.articles.length > 0) {
+                        // Merge blog articles with existing blocks, cap at 3 total
+                        const blogBlocks = data.articles.slice(0, 3).map((a: { title: string; url: string }) => ({
+                          title: a.title,
+                          url: a.url,
+                        }))
+                        setBlocks(blogBlocks)
+                      } else {
+                        setError(data.error || 'No articles found')
+                      }
+                    } catch {
+                      setError('Failed to fetch blog articles')
+                    } finally {
+                      setFetchingBlogArticles(false)
+                    }
+                  }}
+                  disabled={fetchingBlogArticles || !blogUrl}
+                  className="px-3 py-2.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg transition disabled:opacity-50 font-medium text-sm whitespace-nowrap"
+                >
+                  {fetchingBlogArticles ? 'Fetching...' : 'Fetch articles'}
+                </button>
+              </div>
             </div>
 
             {error && (
