@@ -5,6 +5,8 @@ import { createSupabaseServerClient } from '@/lib/supabase-server'
 interface Folder {
   id: string
   name: string
+  level: number
+  parentId?: string
   children?: Folder[]
 }
 
@@ -36,27 +38,57 @@ export async function GET() {
   try {
     const drive = google.drive({ version: 'v3', auth: oauth2Client })
 
-    // List all folders in the user's Drive
+    // Fetch all folders with their parent relationships
     const res = await drive.files.list({
       q: "mimeType='application/vnd.google-apps.folder' and trashed=false",
       fields: 'files(id, name, parents)',
-      pageSize: 100,
+      pageSize: 1000,
       spaces: 'drive',
     })
 
-    const folders = res.data.files || []
-    console.log('[drive/folders] found', folders.length, 'folders')
+    const allFiles = res.data.files || []
+    console.log('[drive/folders] found', allFiles.length, 'folders')
 
-    // Build a simple flat list (not a tree for now, easier to select)
-    const folderList = folders
-      .filter(f => f.name && f.id) // Remove folders without name/id
-      .map(f => ({
-        id: f.id,
-        name: f.name,
-      }))
-      .sort((a, b) => a.name!.localeCompare(b.name!))
+    // Build a map of id -> folder
+    const folderMap = new Map<string, Folder>()
+    const rootFolders: Folder[] = []
 
-    return NextResponse.json({ folders: folderList })
+    // First pass: create all folder objects
+    for (const file of allFiles) {
+      if (file.id && file.name) {
+        folderMap.set(file.id, {
+          id: file.id,
+          name: file.name,
+          level: 0,
+          parentId: file.parents?.[0],
+          children: [],
+        })
+      }
+    }
+
+    // Second pass: build tree by linking parent-child
+    for (const [, folder] of folderMap) {
+      if (folder.parentId && folderMap.has(folder.parentId)) {
+        const parent = folderMap.get(folder.parentId)!
+        if (!parent.children) parent.children = []
+        parent.children.push(folder)
+        folder.level = parent.level + 1
+      } else {
+        // Root folder (no parent in our list, or parent is "My Drive")
+        rootFolders.push(folder)
+      }
+    }
+
+    // Sort children alphabetically
+    const sortFolders = (folders: Folder[]) => {
+      folders.sort((a, b) => a.name.localeCompare(b.name))
+      for (const folder of folders) {
+        if (folder.children) sortFolders(folder.children)
+      }
+    }
+    sortFolders(rootFolders)
+
+    return NextResponse.json({ folders: rootFolders, total: allFiles.length })
   } catch (e) {
     console.error('[drive/folders] error:', e instanceof Error ? e.message : String(e))
     return NextResponse.json({

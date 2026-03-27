@@ -11,6 +11,60 @@ interface UserProfile {
   selected_drive_folders?: string[] // JSON array of folder IDs
 }
 
+function FolderTree({
+  folders,
+  selectedIds,
+  onToggle,
+  searchQuery,
+  level = 0,
+}: {
+  folders: any[]
+  selectedIds: Set<string>
+  onToggle: (id: string) => void
+  searchQuery: string
+  level?: number
+}) {
+  // Filter folders by search query
+  const filtered = folders.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()))
+
+  if (filtered.length === 0) return null
+
+  return (
+    <div className="space-y-1">
+      {filtered.map(folder => {
+        const hasChildren = folder.children && folder.children.length > 0
+        const childrenVisible = !searchQuery && folder.children
+        
+        return (
+          <div key={folder.id}>
+            <label className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded-lg cursor-pointer" style={{ marginLeft: `${level * 16}px` }}>
+              <input
+                type="checkbox"
+                checked={selectedIds.has(folder.id)}
+                onChange={() => onToggle(folder.id)}
+                className="w-4 h-4 rounded border-gray-300 text-violet-600 cursor-pointer"
+              />
+              {hasChildren && (
+                <span className="text-xs text-gray-400">📁</span>
+              )}
+              <span className="text-sm text-gray-900 flex-1">{folder.name}</span>
+            </label>
+            {childrenVisible && (
+              <FolderTree
+                folders={folder.children}
+                selectedIds={selectedIds}
+                onToggle={onToggle}
+                searchQuery={searchQuery}
+                level={level + 1}
+              />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function SettingsPage() {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -20,9 +74,10 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [showFolderBrowser, setShowFolderBrowser] = useState(false)
-  const [availableFolders, setAvailableFolders] = useState<Array<{ id: string; name: string }>>([])
+  const [availableFolders, setAvailableFolders] = useState<any[]>([])
   const [selectedFolderIds, setSelectedFolderIds] = useState<Set<string>>(new Set())
   const [loadingFolders, setLoadingFolders] = useState(false)
+  const [folderSearchQuery, setFolderSearchQuery] = useState('')
   const router = useRouter()
 
   useEffect(() => {
@@ -211,7 +266,7 @@ export default function SettingsPage() {
       {/* Folder Browser Modal */}
       {showFolderBrowser && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-96 flex flex-col">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">Select Drive Folders</h3>
               <button 
@@ -222,31 +277,38 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
+            {/* Search */}
+            <div className="px-6 py-3 border-b border-gray-200">
+              <input
+                type="text"
+                placeholder="Search folders..."
+                value={folderSearchQuery}
+                onChange={(e) => setFolderSearchQuery(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Folder Tree */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
               {loadingFolders ? (
                 <div className="text-center py-8 text-gray-500">Loading folders...</div>
               ) : availableFolders.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">No folders found</div>
               ) : (
-                availableFolders.map(folder => (
-                  <label key={folder.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedFolderIds.has(folder.id)}
-                      onChange={(e) => {
-                        const newIds = new Set(selectedFolderIds)
-                        if (e.target.checked) {
-                          newIds.add(folder.id)
-                        } else {
-                          newIds.delete(folder.id)
-                        }
-                        setSelectedFolderIds(newIds)
-                      }}
-                      className="w-4 h-4 rounded border-gray-300 text-violet-600 cursor-pointer"
-                    />
-                    <span className="text-sm text-gray-900">{folder.name}</span>
-                  </label>
-                ))
+                <FolderTree
+                  folders={availableFolders}
+                  selectedIds={selectedFolderIds}
+                  onToggle={(id) => {
+                    const newIds = new Set(selectedFolderIds)
+                    if (newIds.has(id)) {
+                      newIds.delete(id)
+                    } else {
+                      newIds.add(id)
+                    }
+                    setSelectedFolderIds(newIds)
+                  }}
+                  searchQuery={folderSearchQuery}
+                />
               )}
             </div>
 
