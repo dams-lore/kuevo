@@ -25,9 +25,8 @@ export default function CreatePage() {
   const [result, setResult] = useState<{ slug: string; url: string } | null>(null)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
-  const [integration, setIntegration] = useState<Integration | null>(null)
-  const [checkingIntegration, setCheckingIntegration] = useState(true)
   const [googleConnected, setGoogleConnected] = useState(false)
+  const [checkingIntegration, setCheckingIntegration] = useState(true)
 
   // Email modal state
   const [showEmailModal, setShowEmailModal] = useState(false)
@@ -61,10 +60,7 @@ export default function CreatePage() {
         .eq('provider', 'google')
         .single()
 
-      if (data?.access_token) {
-        setIntegration(data)
-        setGoogleConnected(true)
-      }
+      setGoogleConnected(!!data?.access_token)
       setCheckingIntegration(false)
     }
     checkIntegration()
@@ -341,7 +337,7 @@ export default function CreatePage() {
                       )}
                     </button>
                   </div>
-                  {!integration && (
+                  {!googleConnected && (
                     <p className="text-xs text-gray-400 text-center">Gmail not connected — will open in your mail client instead</p>
                   )}
                 </div>
