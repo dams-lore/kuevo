@@ -37,6 +37,11 @@ export default function CreatePage() {
   const [emailSent, setEmailSent] = useState(false)
   const [emailError, setEmailError] = useState('')
 
+  // Contact autocomplete state
+  const [contactSuggestions, setContactSuggestions] = useState<Array<{name: string; email: string; company: string}>>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [contactSearchLoading, setContactSearchLoading] = useState(false)
+
   useEffect(() => {
     async function checkIntegration() {
       const { data: { session } } = await supabaseBrowser.auth.getSession()
@@ -389,16 +394,66 @@ export default function CreatePage() {
         <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-sm">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Contact name *</label>
                 <input
                   type="text"
                   value={prospectName}
-                  onChange={(e) => setProspectName(e.target.value)}
+                  onChange={async (e) => {
+                    const val = e.target.value
+                    setProspectName(val)
+                    if (val.length >= 2 && integration) {
+                      setContactSearchLoading(true)
+                      try {
+                        const res = await fetch(`/api/contacts/search?q=${encodeURIComponent(val)}`)
+                        const data = await res.json()
+                        setContactSuggestions(data.contacts || [])
+                        setShowSuggestions((data.contacts || []).length > 0)
+                      } catch {
+                        setContactSuggestions([])
+                      } finally {
+                        setContactSearchLoading(false)
+                      }
+                    } else {
+                      setShowSuggestions(false)
+                      setContactSuggestions([])
+                    }
+                  }}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                   required
                   placeholder="Sarah Johnson"
                   className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
                 />
+                {showSuggestions && (
+                  <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                    {contactSearchLoading && (
+                      <div className="px-3 py-2 text-xs text-gray-400">Searching...</div>
+                    )}
+                    {!contactSearchLoading && contactSuggestions.map((c, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onMouseDown={() => {
+                          setProspectName(c.name)
+                          if (c.email) setProspectEmail(c.email)
+                          if (c.company) setCompany(c.company)
+                          setShowSuggestions(false)
+                          setContactSuggestions([])
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-50 transition border-b border-gray-100 last:border-0"
+                      >
+                        <div className="font-medium text-gray-900 text-sm">{c.name}</div>
+                        <div className="text-xs text-gray-500 mt-0.5 flex gap-2">
+                          {c.email && <span>{c.email}</span>}
+                          {c.company && <span>· {c.company}</span>}
+                        </div>
+                      </button>
+                    ))}
+                    {!contactSearchLoading && contactSuggestions.length === 0 && prospectName.length >= 2 && (
+                      <div className="px-3 py-2 text-xs text-gray-400">No contacts found — fill in manually</div>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Company *</label>
