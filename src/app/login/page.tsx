@@ -51,14 +51,15 @@ export default function LoginPage() {
       provider: 'google',
       options: {
         redirectTo: 'https://kuevo.io/auth/callback?next=/dashboard',
-        queryParams: { access_type: 'offline', prompt: 'select_account' },
+        scopes: 'gmail.readonly gmail.send drive.readonly contacts.readonly contacts.other.readonly',
+        queryParams: { access_type: 'offline', prompt: 'consent' },
       },
     })
     if (error) {
       setError(error.message)
       setLoading(false)
     }
-    // on success, browser redirects automatically
+    // On success, browser redirects automatically
   }
 
   return (

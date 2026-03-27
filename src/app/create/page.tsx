@@ -375,42 +375,19 @@ export default function CreatePage() {
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
               </svg>
               {integration ? (
-                <span className="text-green-600 text-sm font-medium">Google connected ✓</span>
+                <span className="text-green-600 text-sm font-medium">Gmail & Drive connected ✓</span>
               ) : (
-                <span className="text-gray-600 text-sm">Connect Google to auto-fill from Gmail &amp; Drive</span>
+                <span className="text-gray-600 text-sm">Sign in with Google above to enable Gmail & Drive</span>
               )}
             </div>
-            {integration ? (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={fetchGoogleContext}
-                  disabled={fetchingContext || !company}
-                  className="text-xs px-3 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg transition disabled:opacity-50"
-                >
-                  {fetchingContext ? 'Fetching...' : '✨ Fetch context'}
-                </button>
-                <button
-                  onClick={async () => {
-                    const { error } = await supabaseBrowser
-                      .from('integrations')
-                      .delete()
-                      .eq('user_id', (await supabaseBrowser.auth.getUser()).data.user?.id)
-                    if (!error) {
-                      setIntegration(null)
-                    }
-                  }}
-                  className="text-xs px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg transition"
-                >
-                  Disconnect
-                </button>
-              </div>
-            ) : (
-              <a
-                href="/api/auth/google"
-                className="text-xs px-3 py-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg transition font-medium"
+            {integration && (
+              <button
+                onClick={fetchGoogleContext}
+                disabled={fetchingContext || !company}
+                className="text-xs px-3 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg transition disabled:opacity-50"
               >
-                Connect Google
-              </a>
+                {fetchingContext ? 'Fetching...' : '✨ Fetch context'}
+              </button>
             )}
           </div>
         )}
