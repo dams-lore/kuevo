@@ -243,14 +243,19 @@ Respond ONLY with valid JSON, no markdown:
       throw new Error('Missing intro in Claude response')
     }
 
+    const filtered = Array.isArray(result.suggested_blocks)
+      ? result.suggested_blocks.filter((b: { title?: string; url?: string }) => b.title && b.url)
+      : []
+    console.log('[google/context] claude suggested_blocks:', result.suggested_blocks)
+    console.log('[google/context] after filtering:', filtered)
+    
     return NextResponse.json({
       intro: result.intro,
-      suggested_blocks: Array.isArray(result.suggested_blocks)
-        ? result.suggested_blocks.filter((b: { title?: string; url?: string }) => b.title && b.url)
-        : [],
+      suggested_blocks: filtered,
       debug: {
         emails_found: emailSummaries.length,
         drive_files_found: driveFiles.length,
+        drive_files_returned_to_claude: driveFiles.map(f => ({ name: f.name, url: f.webViewLink })),
         domains_searched: domains,
       },
     })
