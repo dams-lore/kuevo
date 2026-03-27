@@ -44,9 +44,10 @@ export async function GET(req: Request) {
   const contacts: Contact[] = []
 
   const peopleApi = google.people({ version: 'v1', auth: oauth2Client })
+  const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
 
   try {
-    // Fetch all contacts and filter client-side
+    // Fetch Google Contacts
     console.log('[contacts/search] fetching connections with query:', query)
     const res = await peopleApi.people.connections.list({
       resourceName: 'people/me',
@@ -69,6 +70,68 @@ export async function GET(req: Request) {
     }
   } catch (e) {
     console.error('[contacts/search] people API error:', e instanceof Error ? e.message : String(e))
+  }
+
+  // Also extract contacts from recent emails (sender/recipient names)
+  try {
+    console.log('[contacts/search] fetching recent emails for contact extraction...')
+    const emailRes = await gmail.users.messages.list({
+      userId: 'me',
+      maxResults: 50,
+      q: 'in:sent OR in:inbox',
+    })
+
+    const emailContactMap = new Map<string, { name: string; email: string }>()
+
+    for (const msg of emailRes.data.messages || []) {
+      try {
+        const full = await gmail.users.messages.get({
+          userId: 'me',
+          id: msg.id!,
+          format: 'metadata',
+          metadataHeaders: ['From', 'To', 'Cc'],
+        })
+
+        const headers = full.data.payload?.headers || []
+        const parseEmailHeader = (header: string) => {
+          // Parse "Name <email@domain.com>" or just "email@domain.com"
+          const match = header.match(/^([^<]*?)\s*<([^>]+)>|^([^<]+)$/)
+          if (match) {
+            const name = (match[1] || match[3] || '').trim()
+            const email = match[2] || match[3]
+            return { name, email }
+          }
+          return null
+        }
+
+        for (const headerName of ['From', 'To', 'Cc']) {
+          const header = headers.find(h => h.name === headerName)?.value
+          if (header) {
+            // Split by comma for multiple recipients
+            for (const part of header.split(',')) {
+              const parsed = parseEmailHeader(part.trim())
+              if (parsed && parsed.email && !emailContactMap.has(parsed.email.toLowerCase())) {
+                emailContactMap.set(parsed.email.toLowerCase(), parsed)
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // Skip individual message errors
+      }
+    }
+
+    // Filter email contacts by query and add to results
+    for (const [, contact] of emailContactMap) {
+      if ((contact.name?.toLowerCase().includes(query.toLowerCase()) || 
+           contact.email?.toLowerCase().includes(query.toLowerCase())) &&
+          !contacts.find(c => c.email === contact.email)) {
+        console.log('[contacts/search] found email contact:', contact)
+        contacts.push({ name: contact.name || contact.email, email: contact.email, company: '', source: 'google' })
+      }
+    }
+  } catch (e) {
+    console.error('[contacts/search] email extraction error:', e instanceof Error ? e.message : String(e))
   }
 
   console.log('[contacts/search] returning', contacts.length, 'contacts')
