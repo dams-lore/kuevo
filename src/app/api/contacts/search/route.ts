@@ -93,5 +93,6 @@ export async function GET(req: Request) {
   console.log('[contacts/search] email extraction disabled (Gmail API optimization needed)')
 
   console.log('[contacts/search] returning', contacts.length, 'contacts')
+  console.log('[contacts/search] sample contacts:', contacts.slice(0, 3))
   return NextResponse.json({ contacts: contacts.slice(0, 8) })
 }

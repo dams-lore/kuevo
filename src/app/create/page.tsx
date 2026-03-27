@@ -430,13 +430,18 @@ export default function CreatePage() {
                     if (val.length >= 2) {
                       setContactSearchLoading(true)
                       try {
+                        console.log('[create] searching contacts for:', val)
                         const res = await fetch(`/api/contacts/search?q=${encodeURIComponent(val)}`)
+                        console.log('[create] contact search response status:', res.status)
                         const data = await res.json()
+                        console.log('[create] contact search data:', data)
                         // Always show suggestions if we got results, even if there's an error
                         if (data.contacts && data.contacts.length > 0) {
+                          console.log('[create] found', data.contacts.length, 'contacts')
                           setContactSuggestions(data.contacts)
                           setShowSuggestions(true)
                         } else {
+                          console.log('[create] no contacts found')
                           setContactSuggestions([])
                           setShowSuggestions(false)
                         }
