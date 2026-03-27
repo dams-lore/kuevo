@@ -46,9 +46,7 @@ export default function CreatePage() {
   const [blogUrl, setBlogUrl] = useState('')
   const [fetchingBlogArticles, setFetchingBlogArticles] = useState(false)
 
-  // Drive folders filter
-  const [excludeInvoices, setExcludeInvoices] = useState(true)
-  const [excludeFinancial, setExcludeFinancial] = useState(true)
+
 
   useEffect(() => {
     async function checkIntegration() {
@@ -120,8 +118,6 @@ export default function CreatePage() {
         body: JSON.stringify({ 
           prospect_name: prospectName, 
           company,
-          exclude_invoices: excludeInvoices,
-          exclude_financial: excludeFinancial,
         }),
       })
       const data = await res.json()
@@ -367,33 +363,6 @@ export default function CreatePage() {
       <main className="max-w-2xl mx-auto px-6 py-10">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Create a page</h1>
         <p className="text-gray-500 text-sm mb-8">Build a personalized link page for your prospect</p>
-
-        {/* Drive Content Filter */}
-        {integration && (
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Drive content filter</h3>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={excludeInvoices}
-                  onChange={(e) => setExcludeInvoices(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300 text-violet-600 cursor-pointer"
-                />
-                <span className="text-sm text-gray-700">Exclude invoices & receipts</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={excludeFinancial}
-                  onChange={(e) => setExcludeFinancial(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300 text-violet-600 cursor-pointer"
-                />
-                <span className="text-sm text-gray-700">Exclude financial reports & data</span>
-              </label>
-            </div>
-          </div>
-        )}
 
         {/* Google Integration Banner */}
         {!checkingIntegration && (

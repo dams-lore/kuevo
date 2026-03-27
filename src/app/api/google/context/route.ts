@@ -66,12 +66,15 @@ export async function POST(req: Request) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { prospect_name, company, exclude_invoices = true, exclude_financial = true } = await req.json()
+  const { prospect_name, company } = await req.json()
   if (!prospect_name || !company) {
     return NextResponse.json({ error: 'prospect_name and company are required' }, { status: 400 })
   }
 
-  console.log('[google/context] filters:', { exclude_invoices, exclude_financial })
+  // Always exclude invoices and financial data by default
+  const exclude_invoices = true
+  const exclude_financial = true
+  console.log('[google/context] always excluding invoices and financial data')
 
   // Get integration tokens
   const { data: integration, error: intError } = await supabase

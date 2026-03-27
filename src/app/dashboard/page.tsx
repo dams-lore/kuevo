@@ -131,8 +131,14 @@ export default function DashboardPage() {
         <a href="/" className="text-xl font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
           kuevo
         </a>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <span className="text-sm text-gray-500">{user?.email}</span>
+          <a
+            href="/settings"
+            className="text-sm text-gray-500 hover:text-gray-900 transition px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg"
+          >
+            Settings
+          </a>
           <button
             onClick={signOut}
             className="text-sm text-gray-500 hover:text-gray-900 transition px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg"
