@@ -143,42 +143,57 @@ export async function POST(req: Request) {
   let driveFiles: DriveFile[] = []
 
   try {
-    // Search by name (company name or first word)
-    const firstWord = company.split(/\s+/)[0]
-    const driveQuery = `(name contains '${company}' OR name contains '${firstWord}') and trashed = false`
+    // Search by company name as keyword (not by domain)
+    // Try specific search first
+    const driveQuery = `name contains '${company}' and trashed = false`
     console.log('[google/context] drive query:', driveQuery)
 
     const filesRes = await drive.files.list({
       q: driveQuery,
       fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
-      pageSize: 20,
+      pageSize: 50,
       orderBy: 'modifiedTime desc',
     })
 
-    const allFiles = filesRes.data.files || []
-    console.log('[google/context] drive files found:', allFiles.length)
+    let allFiles = filesRes.data.files || []
+    console.log('[google/context] drive files found with company name:', allFiles.length)
 
-    // Filter to shareable doc types, prefer Docs/Sheets/Slides/PDF
-    const priority = ['application/vnd.google-apps.presentation', 'application/vnd.google-apps.document', 'application/pdf', 'application/vnd.google-apps.spreadsheet']
-    const sorted = [...allFiles].sort((a, b) => {
-      const ai = priority.indexOf(a.mimeType || '')
-      const bi = priority.indexOf(b.mimeType || '')
-      const aScore = ai === -1 ? 99 : ai
-      const bScore = bi === -1 ? 99 : bi
-      return aScore - bScore
+    // If not enough results, do a broader search for recently modified files
+    if (allFiles.length < 3) {
+      console.log('[google/context] fallback: searching for 5 most recent files')
+      const fallbackRes = await drive.files.list({
+        q: 'trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/vnd.google-apps.spreadsheet" OR mimeType="application/pdf")',
+        fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
+        pageSize: 5,
+        orderBy: 'modifiedTime desc',
+      })
+      allFiles = allFiles.concat(fallbackRes.data.files || [])
+    }
+
+    console.log('[google/context] total files after fallback:', allFiles.length)
+
+    // Remove duplicates and sort by modification time (most recent first)
+    const uniqueFiles = Array.from(
+      new Map(allFiles.map(f => [f.id, f])).values()
+    ).sort((a, b) => {
+      const aTime = new Date(a.modifiedTime || 0).getTime()
+      const bTime = new Date(b.modifiedTime || 0).getTime()
+      return bTime - aTime
     })
 
-    // CAP AT 3 FILES
-    driveFiles = sorted.slice(0, 3).map(f => {
-      console.log('[google/context] selected drive file:', { name: f.name, type: f.mimeType })
+    // CAP AT 3 FILES - ALWAYS RETURN UP TO 3, EVEN IF LOW RELEVANCE
+    driveFiles = uniqueFiles.slice(0, 3).map(f => {
+      console.log('[google/context] selected drive file:', { name: f.name, type: f.mimeType, modified: f.modifiedTime })
       return {
         name: f.name || '',
         webViewLink: f.webViewLink || '',
         mimeType: f.mimeType || '',
       }
     })
+    
+    console.log('[google/context] final drive files:', driveFiles.length)
   } catch (e) {
-    console.error('[google/context] drive error:', e)
+    console.error('[google/context] drive error:', e instanceof Error ? e.message : String(e))
   }
 
   // ── Claude ────────────────────────────────────────────────────────────────

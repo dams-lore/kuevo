@@ -402,14 +402,21 @@ export default function CreatePage() {
                   onChange={async (e) => {
                     const val = e.target.value
                     setProspectName(val)
-                    if (val.length >= 2 && integration) {
+                    if (val.length >= 2) {
                       setContactSearchLoading(true)
                       try {
                         const res = await fetch(`/api/contacts/search?q=${encodeURIComponent(val)}`)
                         const data = await res.json()
-                        setContactSuggestions(data.contacts || [])
-                        setShowSuggestions((data.contacts || []).length > 0)
-                      } catch {
+                        // Always show suggestions if we got results, even if there's an error
+                        if (data.contacts && data.contacts.length > 0) {
+                          setContactSuggestions(data.contacts)
+                          setShowSuggestions(true)
+                        } else {
+                          setContactSuggestions([])
+                          setShowSuggestions(false)
+                        }
+                      } catch (e) {
+                        console.error('[create] autocomplete fetch error:', e)
                         setContactSuggestions([])
                       } finally {
                         setContactSearchLoading(false)
