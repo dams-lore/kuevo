@@ -295,28 +295,22 @@ export async function POST(req: Request) {
     ? driveFiles.map(f => `- ${f.name} (${f.webViewLink})`).join('\n')
     : 'No relevant Drive files found.'
 
-  const topicsStr = uniqueTopics.length > 0 ? `Topics discussed: ${uniqueTopics.join(', ')}` : 'No specific topics extracted'
+  const emailSubjectsStr = emailSummaries.slice(0, 3).join(' | ') || 'No emails found'
   const detectedLanguage = detectLanguage(emailSummaries)
   console.log('[google/context] detected language:', detectedLanguage)
 
-  const prompt = `Generate a 2-line intro message in ${detectedLanguage} for a sales follow-up page.
+  const prompt = `Generate a 2-line intro message for a sales follow-up page:
 
-PROSPECT: ${prospect_name} at ${company}
+Line 1: A punchy subject line (max 8 words, no filler words like "I hope", "please find", "following our")
+Line 2: One sentence explaining what's in the page and why it's relevant for them (max 20 words)
 
-EMAIL TOPICS: ${topicsStr}
+Context about the contact:
+- Name: ${prospect_name}
+- Company: ${company}
+- Recent email subjects: ${emailSubjectsStr}
+- Detected language: ${detectedLanguage}
 
-AVAILABLE FILES:
-${driveContext}
-
-FORMAT (exactly 2 lines, no more):
-Line 1: Subject line — short, punchy, like an email subject (max 10 words)
-Line 2: One engaging punchline referencing the email topics (max 20 words)
-
-RULES:
-- Only output these 2 lines, nothing else
-- Reference at least one topic from the emails
-- Respond in ${detectedLanguage}
-- Professional but warm tone
+Respond ONLY in ${detectedLanguage}. No greetings, no signature, no extra text. Just 2 lines.
 
 Also suggest up to 3 relevant files that match the topics discussed.
 
@@ -357,6 +351,8 @@ Respond ONLY with valid JSON, no markdown:
     return NextResponse.json({
       intro: result.intro,
       suggested_blocks: filtered,
+      email_subjects: emailSubjectsStr,
+      detected_language: detectedLanguage,
       debug: {
         emails_found: emailSummaries.length,
         drive_files_found: driveFiles.length,
