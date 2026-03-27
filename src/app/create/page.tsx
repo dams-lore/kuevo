@@ -427,9 +427,9 @@ export default function CreatePage() {
                 <button
                   onClick={fetchGoogleContext}
                   disabled={fetchingContext || !company}
-                  className="w-full text-sm px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+                  className="w-full text-sm px-4 py-2.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg transition font-medium"
                 >
-                  {fetchingContext ? 'Fetching...' : '📁 Fetch content'}
+                  {fetchingContext ? 'Fetching...' : '✨ Fetch content'}
                 </button>
               )}
 
