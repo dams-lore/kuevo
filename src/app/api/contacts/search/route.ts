@@ -60,11 +60,21 @@ export async function GET(req: Request) {
     for (const person of res.data.connections || []) {
       const name = person.names?.[0]?.displayName || ''
       const email = person.emailAddresses?.[0]?.value || ''
-      const company = person.organizations?.[0]?.name || ''
+      let company = person.organizations?.[0]?.name || ''
       
-      // Debug: log organization data
-      if (person.organizations && person.organizations.length > 0) {
-        console.log('[contacts/search] person has org:', { name, organizations: person.organizations })
+      // If no company registered, guess from email domain
+      if (!company && email) {
+        const domain = email.split('@')[1]
+        if (domain) {
+          // Convert domain to company name: "acmecorp.com" → "Acme Corp"
+          company = domain
+            .split('.')[0] // Remove TLD
+            .split('-').join(' ') // Replace hyphens with spaces
+            .split('_').join(' ') // Replace underscores with spaces
+            .split(/(?=[A-Z])/).join(' ') // Split camelCase
+            .replace(/\b\w/g, (l) => l.toUpperCase()) // Capitalize each word
+            .trim()
+        }
       }
       
       // Filter by query (client-side since API doesn't have great search)
