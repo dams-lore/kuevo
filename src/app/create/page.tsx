@@ -27,6 +27,7 @@ export default function CreatePage() {
   const [copied, setCopied] = useState(false)
   const [integration, setIntegration] = useState<Integration | null>(null)
   const [checkingIntegration, setCheckingIntegration] = useState(true)
+  const [googleConnected, setGoogleConnected] = useState(false)
 
   // Email modal state
   const [showEmailModal, setShowEmailModal] = useState(false)
@@ -55,11 +56,15 @@ export default function CreatePage() {
 
       const { data } = await supabaseBrowser
         .from('integrations')
-        .select('id, provider')
+        .select('*')
         .eq('user_id', session.user.id)
+        .eq('provider', 'google')
         .single()
 
-      if (data) setIntegration(data)
+      if (data?.access_token) {
+        setIntegration(data)
+        setGoogleConnected(true)
+      }
       setCheckingIntegration(false)
     }
     checkIntegration()
@@ -374,13 +379,13 @@ export default function CreatePage() {
                 <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
               </svg>
-              {integration ? (
-                <span className="text-green-600 text-sm font-medium">Gmail & Drive connected ✓</span>
+              {googleConnected ? (
+                <span className="text-green-600 text-sm font-medium">✓ Gmail & Drive connected</span>
               ) : (
-                <span className="text-gray-600 text-sm">Sign in with Google above to enable Gmail & Drive</span>
+                <span className="text-gray-600 text-sm">Not connected</span>
               )}
             </div>
-            {integration && (
+            {googleConnected && (
               <button
                 onClick={fetchGoogleContext}
                 disabled={fetchingContext || !company}
@@ -388,6 +393,14 @@ export default function CreatePage() {
               >
                 {fetchingContext ? 'Fetching...' : '✨ Fetch context'}
               </button>
+            )}
+            {!googleConnected && (
+              <a
+                href="/settings"
+                className="text-xs px-3 py-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg transition inline-block"
+              >
+                Connect Google
+              </a>
             )}
           </div>
         )}

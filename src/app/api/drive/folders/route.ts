@@ -47,7 +47,8 @@ export async function GET() {
     })
 
     const allFiles = res.data.files || []
-    console.log('[drive/folders] found', allFiles.length, 'folders')
+    console.log('[drive/folders] found', allFiles.length, 'total folders')
+    console.log('[drive/folders] sample files:', allFiles.slice(0, 3).map(f => ({ id: f.id, name: f.name, parents: f.parents })))
 
     // Build a map of id -> folder
     const folderMap = new Map<string, Folder>()
@@ -88,6 +89,7 @@ export async function GET() {
     }
     sortFolders(rootFolders)
 
+    console.log('[drive/folders] root folders:', rootFolders.length, 'children folders:', allFiles.length - rootFolders.length)
     return NextResponse.json({ folders: rootFolders, total: allFiles.length })
   } catch (e) {
     console.error('[drive/folders] error:', e instanceof Error ? e.message : String(e))

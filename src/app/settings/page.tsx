@@ -78,6 +78,7 @@ export default function SettingsPage() {
   const [selectedFolderIds, setSelectedFolderIds] = useState<Set<string>>(new Set())
   const [loadingFolders, setLoadingFolders] = useState(false)
   const [folderSearchQuery, setFolderSearchQuery] = useState('')
+  const [googleConnected, setGoogleConnected] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -89,7 +90,19 @@ export default function SettingsPage() {
       }
       setUser(authUser)
 
-      // Check if profiles table exists, if not create basic profile
+      // Check Google integration
+      const { data: integration } = await supabaseBrowser
+        .from('integrations')
+        .select('*')
+        .eq('user_id', authUser.id)
+        .eq('provider', 'google')
+        .single()
+
+      if (integration?.access_token) {
+        setGoogleConnected(true)
+      }
+
+      // Check if user profile exists, if not create one
       const { data: existingProfile } = await supabaseBrowser
         .from('user_profiles')
         .select('*')
@@ -159,11 +172,19 @@ export default function SettingsPage() {
     const confirmed = window.confirm('Disconnect Google account? You will need to reconnect to use Gmail and Drive features.')
     if (!confirmed) return
 
-    await supabaseBrowser
+    const { error } = await supabaseBrowser
       .from('integrations')
       .delete()
       .eq('user_id', user.id)
-    window.location.reload()
+      .eq('provider', 'google')
+
+    if (!error) {
+      setGoogleConnected(false)
+      setMessage('Google account disconnected')
+      setTimeout(() => setMessage(''), 3000)
+    } else {
+      setMessage('Error disconnecting: ' + error.message)
+    }
   }
 
   if (loading) {
@@ -236,13 +257,31 @@ export default function SettingsPage() {
           {/* Google Integration */}
           <div>
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Google Integration</h2>
-            <button
-              onClick={handleDisconnectGoogle}
-              className="px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg transition font-medium text-sm"
-            >
-              Disconnect Google
-            </button>
-            <p className="text-xs text-gray-500 mt-2">You'll need to reconnect to use Gmail contacts and Drive file features</p>
+            {googleConnected ? (
+              <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-green-600 text-lg">✓</span>
+                  <span className="text-sm text-green-700 font-medium">Gmail & Drive connected</span>
+                </div>
+                <button
+                  onClick={handleDisconnectGoogle}
+                  className="text-xs text-red-600 hover:text-red-800 underline"
+                >
+                  Disconnect
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <span className="text-sm text-gray-600">Not connected</span>
+                <a
+                  href="/login"
+                  className="text-xs px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition"
+                >
+                  Connect Google
+                </a>
+              </div>
+            )}
+            <p className="text-xs text-gray-500 mt-2">Required to search Gmail contacts and Drive files</p>
           </div>
 
           {/* Save Button */}
