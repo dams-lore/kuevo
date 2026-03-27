@@ -67,29 +67,31 @@ export default function CreatePage() {
     document.body.appendChild(script)
   }, [])
 
-  function openDrivePicker(blockIndex: number) {
+  async function openDrivePicker(blockIndex: number) {
     if (!window.gapi || !window.gapi.load) {
       toast.error('Google API not loaded yet. Please try again.')
       return
     }
 
-    const { data: { session } } = supabaseBrowser.auth.getSession().then(res => res.data)
+    const { data } = await supabaseBrowser.auth.getSession()
+    const session = data?.session
     if (!session) {
       toast.error('Not authenticated')
       return
     }
 
     window.gapi.load('picker', { callback: () => {
-      const token = localStorage.getItem('sb-auth-token') // Try to get token from storage
+      // Get access token from session
+      const accessToken = session.provider_token
       
-      if (!token) {
-        toast.error('Authentication required. Please reconnect Google.')
+      if (!accessToken) {
+        toast.error('Google access not available. Please reconnect.')
         return
       }
 
       const picker = new window.google.picker.PickerBuilder()
         .addView(window.google.picker.ViewId.DOCS)
-        .setOAuthToken(token)
+        .setOAuthToken(accessToken)
         .setCallback((data: any) => {
           if (data.action === window.google.picker.Action.PICKED) {
             const file = data.docs[0]
