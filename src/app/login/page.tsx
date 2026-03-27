@@ -51,7 +51,7 @@ export default function LoginPage() {
       provider: 'google',
       options: {
         redirectTo: 'https://kuevo.io/auth/callback?next=/dashboard',
-        scopes: 'gmail.readonly gmail.send drive.readonly contacts.readonly contacts.other.readonly',
+        scopes: 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/contacts.readonly https://www.googleapis.com/auth/contacts.other.readonly',
         queryParams: { access_type: 'offline', prompt: 'consent' },
       },
     })
