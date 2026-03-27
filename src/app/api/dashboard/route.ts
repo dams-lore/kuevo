@@ -59,6 +59,9 @@ export async function GET() {
     )
     const lastVisit = sortedVisits[0]?.created_at || null
 
+    // Average time spent
+    const avgTimeSpent = visits.length > 0 ? Math.round(totalTimeSeconds / visits.length) : 0
+
     return {
       id: page.id,
       slug: page.slug,
@@ -68,8 +71,27 @@ export async function GET() {
       visit_count: visits.length,
       last_visit: lastVisit,
       engagement_score: score,
+      avg_time_spent: avgTimeSpent,
+      total_time_spent: totalTimeSeconds,
     }
   })
 
-  return NextResponse.json({ pages: pagesWithScores })
+  // Compute aggregate metrics
+  const totalPages = pagesWithScores.length
+  const totalOpens = pagesWithScores.reduce((sum, p) => sum + p.visit_count, 0)
+  const thisWeek = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  const activeThisWeek = pagesWithScores.filter(p => new Date(p.created_at) > thisWeek).length
+  const avgTimeSpentAll = pagesWithScores.length > 0
+    ? Math.round(pagesWithScores.reduce((sum, p) => sum + p.avg_time_spent, 0) / pagesWithScores.length)
+    : 0
+
+  return NextResponse.json({
+    metrics: {
+      total_pages: totalPages,
+      total_opens: totalOpens,
+      active_this_week: activeThisWeek,
+      avg_time_spent: avgTimeSpentAll,
+    },
+    pages: pagesWithScores,
+  })
 }
