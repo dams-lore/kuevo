@@ -62,6 +62,11 @@ export async function GET(req: Request) {
       const email = person.emailAddresses?.[0]?.value || ''
       const company = person.organizations?.[0]?.name || ''
       
+      // Debug: log organization data
+      if (person.organizations?.length > 0) {
+        console.log('[contacts/search] person has org:', { name, organizations: person.organizations })
+      }
+      
       // Filter by query (client-side since API doesn't have great search)
       if ((name?.toLowerCase().includes(query.toLowerCase()) || email?.toLowerCase().includes(query.toLowerCase())) && (name || email)) {
         console.log('[contacts/search] found contact:', { name, email, company })
