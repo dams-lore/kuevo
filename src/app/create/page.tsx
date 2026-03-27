@@ -343,24 +343,13 @@ export default function CreatePage() {
             <div className="space-y-3">
               <p className="text-sm text-gray-600">Subject line + one engaging punchline</p>
 
-              <div className="flex gap-2">
-                {googleConnected && (
-                  <button
-                    onClick={fetchGoogleContext}
-                    disabled={fetchingContext || !company}
-                    className="text-sm px-3 py-2 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg transition disabled:opacity-50 font-medium"
-                  >
-                    {fetchingContext ? 'Fetching...' : '✨ Fetch context'}
-                  </button>
-                )}
-                <button
-                  onClick={generateIntro}
-                  disabled={generatingIntro || !company}
-                  className="text-sm px-3 py-2 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg transition disabled:opacity-50 font-medium"
-                >
-                  {generatingIntro ? 'Generating...' : '✨ Generate with AI'}
-                </button>
-              </div>
+              <button
+                onClick={generateIntro}
+                disabled={generatingIntro || !company}
+                className="w-full text-sm px-4 py-2.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg transition disabled:opacity-50 font-medium"
+              >
+                {generatingIntro ? 'Generating...' : '✨ Generate with AI'}
+              </button>
 
               <textarea
                 rows={4}
