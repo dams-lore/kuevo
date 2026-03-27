@@ -144,8 +144,8 @@ export async function POST(req: Request) {
 
   try {
     // Search by company name as keyword (not by domain)
-    // Try specific search first
-    const driveQuery = `name contains '${company}' and trashed = false`
+    // Try specific search first — NO SPREADSHEETS (security risk)
+    const driveQuery = `name contains '${company}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")`
     console.log('[google/context] drive query:', driveQuery)
 
     const filesRes = await drive.files.list({
@@ -158,11 +158,11 @@ export async function POST(req: Request) {
     let allFiles = filesRes.data.files || []
     console.log('[google/context] drive files found with company name:', allFiles.length)
 
-    // If not enough results, do a broader search for recently modified files
+    // If not enough results, do a broader search for recently modified files (NO SPREADSHEETS - security risk)
     if (allFiles.length < 3) {
-      console.log('[google/context] fallback: searching for 5 most recent files')
+      console.log('[google/context] fallback: searching for 5 most recent files (docs, presentations, pdfs only)')
       const fallbackRes = await drive.files.list({
-        q: 'trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/vnd.google-apps.spreadsheet" OR mimeType="application/pdf")',
+        q: 'trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")',
         fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
         pageSize: 5,
         orderBy: 'modifiedTime desc',
