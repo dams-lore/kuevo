@@ -234,6 +234,7 @@ export async function POST(req: Request) {
             pageSize: 10,
             orderBy: 'modifiedTime desc',
           })
+          console.log('[google/context] topic search returned:', topicRes.data.files?.length || 0, 'files')
           allFiles = allFiles.concat(topicRes.data.files || [])
         } catch (e) {
           console.error('[google/context] topic search error:', e)
@@ -248,26 +249,42 @@ export async function POST(req: Request) {
       const companyQuery = `name contains '${company}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions} ${invoiceExclusions}`
       console.log('[google/context] fallback company search:', companyQuery)
 
-      const filesRes = await drive.files.list({
-        q: companyQuery,
-        fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
-        pageSize: 50,
-        orderBy: 'modifiedTime desc',
-      })
-      allFiles = allFiles.concat(filesRes.data.files || [])
-      console.log('[google/context] drive files found with company name:', filesRes.data.files?.length || 0)
+      try {
+        const filesRes = await drive.files.list({
+          q: companyQuery,
+          fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
+          pageSize: 50,
+          orderBy: 'modifiedTime desc',
+        })
+        console.log('[google/context] company search returned:', filesRes.data.files?.length || 0, 'files')
+        allFiles = allFiles.concat(filesRes.data.files || [])
+      } catch (e) {
+        console.error('[google/context] company search error:', e)
+      }
     }
 
-    // If not enough results, do a broader search for recently modified files (NO SPREADSHEETS - security risk)
+    // If not enough results, search for files modified in last 60 days
     if (allFiles.length < 3) {
-      console.log('[google/context] fallback: searching for 5 most recent files (docs, presentations, pdfs only)')
-      const fallbackRes = await drive.files.list({
-        q: `trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions}`,
-        fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
-        pageSize: 5,
-        orderBy: 'modifiedTime desc',
-      })
-      allFiles = allFiles.concat(fallbackRes.data.files || [])
+      const sixtyDaysAgo = new Date()
+      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60)
+      const dateStr = sixtyDaysAgo.toISOString().split('T')[0]
+      
+      const recentQuery = `modifiedTime > '${dateStr}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions}`
+      console.log('[google/context] fallback recent files search (60 days):', recentQuery)
+      
+      try {
+        const recentRes = await drive.files.list({
+          q: recentQuery,
+          fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
+          pageSize: 10,
+          orderBy: 'modifiedTime desc',
+        })
+        console.log('[google/context] recent files search returned:', recentRes.data.files?.length || 0, 'files')
+        allFiles = allFiles.concat(recentRes.data.files || [])
+      } catch (e) {
+        console.error('[google/context] recent files search error:', e)
+      }
+    }
     }
 
     console.log('[google/context] total files after fallback:', allFiles.length)
@@ -304,10 +321,16 @@ export async function POST(req: Request) {
   // Fetch from external sources (user-configured blogs/RSS)
   let externalArticles: Array<{ title: string; url: string }> = []
   try {
-    const { data: sources } = await supabase
+    const { data: sources, error: sourcesError } = await supabase
       .from('external_sources')
       .select('*')
       .eq('user_id', session.user.id)
+
+    console.log('[google/context] external_sources query - found:', sources?.length || 0, 'sources, error:', sourcesError?.message || 'none')
+    
+    if (sourcesError) {
+      console.error('[google/context] external_sources fetch error:', sourcesError)
+    }
 
     if (sources && sources.length > 0) {
       console.log('[google/context] found', sources.length, 'configured external sources')
@@ -321,8 +344,10 @@ export async function POST(req: Request) {
             headers: { 'User-Agent': 'Kuevo/1.0' }
           })
           
+          console.log('[google/context] fetched source, status:', res.status, 'url:', source.url)
+          
           if (!res.ok) {
-            console.warn('[google/context] source returned', res.status, ':', source.url)
+            console.warn('[google/context] source returned non-ok status', res.status, ':', source.url)
             continue
           }
           
