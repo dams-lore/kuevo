@@ -265,6 +265,9 @@ export default function CreatePage() {
   }
 
   if (successUrl) {
+    const slug = successUrl.split('/').pop()
+    const previewUrl = `/preview/${slug}`
+    
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6">
         <Toaster position="bottom-right" />
@@ -278,7 +281,7 @@ export default function CreatePage() {
             <p className="font-mono text-sm text-gray-900 break-all">{successUrl}</p>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 mb-4">
             <button
               onClick={() => {
                 navigator.clipboard.writeText(successUrl)
@@ -289,12 +292,19 @@ export default function CreatePage() {
               📋 Copy link
             </button>
             <button
-              onClick={() => setSuccessUrl(null)}
+              onClick={() => window.open(previewUrl, '_blank')}
               className="flex-1 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition"
             >
-              Create another
+              👁️ Preview
             </button>
           </div>
+
+          <button
+            onClick={() => setSuccessUrl(null)}
+            className="w-full px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition text-sm"
+          >
+            Create another
+          </button>
 
           <a
             href="/dashboard"
