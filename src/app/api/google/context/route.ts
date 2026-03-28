@@ -123,6 +123,15 @@ export async function POST(req: Request) {
     refresh_token: integration.refresh_token,
   })
 
+  // Verify Drive access
+  console.log('[google/context] ========== AUTH CHECK ==========')
+  console.log('[google/context] user_id:', session.user.id)
+  console.log('[google/context] has access_token:', !!integration.access_token)
+  console.log('[google/context] has refresh_token:', !!integration.refresh_token)
+  console.log('[google/context] prospect_name:', prospect_name)
+  console.log('[google/context] company:', company)
+  console.log('[google/context] =====================================')
+
   // Refresh token if needed
   await refreshTokenIfNeeded(oauth2Client, integration, supabase, session.user.id)
 
@@ -212,6 +221,7 @@ export async function POST(req: Request) {
       .join(' ')
 
     // Search by email topics first (most relevant)
+    console.log('[google/context] starting drive search with', uniqueTopics.length, 'topics')
     for (const topic of uniqueTopics) {
       if (topic) {
         const topicQuery = `name contains '${topic}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions} ${invoiceExclusions}`
