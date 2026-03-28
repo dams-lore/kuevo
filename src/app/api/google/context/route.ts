@@ -484,9 +484,16 @@ Respond ONLY with valid JSON, no markdown:
       detected_language: detectedLanguage,
       debug: {
         emails_found: emailSummaries.length,
+        email_topics_extracted: uniqueTopics.length,
+        external_sources_found: externalArticles.length,
         drive_files_found: driveFiles.length,
+        total_content_sources: driveFiles.length + externalArticles.length,
         drive_files_returned_to_claude: driveFiles.map(f => ({ name: f.name, url: f.webViewLink })),
+        external_articles_returned: externalArticles.slice(0, 3).map(a => ({ title: a.title, url: a.url })),
         domains_searched: domains,
+        has_access_token: !!integration.access_token,
+        prospect_name: prospect_name,
+        company: company,
       },
     })
   } catch (e) {
