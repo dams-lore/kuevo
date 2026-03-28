@@ -291,25 +291,91 @@ export async function POST(req: Request) {
     ? emailSummaries.join('\n\n---\n\n')
     : 'No emails found with this company domain.'
 
-  // Also fetch from external sources
+  // Fetch from external sources (user-configured blogs/RSS)
   let externalArticles: Array<{ title: string; url: string }> = []
   try {
-    const externalRes = await fetch('https://kuevo.io/api/external-sources/fetch', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${integration.access_token}` // Pass through auth
-      },
-      body: JSON.stringify({ user_id: session.user.id }),
-    })
-    
-    if (externalRes.ok) {
-      const externalData = await externalRes.json()
-      externalArticles = externalData.articles || []
-      console.log('[google/context] fetched', externalArticles.length, 'articles from external sources')
+    const { data: sources } = await supabase
+      .from('external_sources')
+      .select('*')
+      .eq('user_id', session.user.id)
+
+    if (sources && sources.length > 0) {
+      console.log('[google/context] found', sources.length, 'configured external sources')
+      
+      for (const source of sources) {
+        console.log('[google/context] fetching from', source.source_type, ':', source.url)
+        
+        try {
+          const res = await fetch(source.url, { 
+            signal: AbortSignal.timeout(5000),
+            headers: { 'User-Agent': 'Kuevo/1.0' }
+          })
+          
+          if (!res.ok) {
+            console.warn('[google/context] source returned', res.status, ':', source.url)
+            continue
+          }
+          
+          const text = await res.text()
+          
+          // Parse based on source type
+          if (source.source_type === 'rss') {
+            const itemRegex = /<item>([\s\S]*?)<\/item>/g
+            let match
+            while ((match = itemRegex.exec(text)) !== null) {
+              const itemContent = match[1]
+              const titleMatch = /<title[^>]*>([\s\S]*?)<\/title>/.exec(itemContent)
+              const linkMatch = /<link[^>]*>([\s\S]*?)<\/link>/.exec(itemContent)
+              
+              if (titleMatch && linkMatch) {
+                const title = titleMatch[1].replace(/<[^>]*>/g, '').trim()
+                const url = linkMatch[1].replace(/<[^>]*>/g, '').trim()
+                
+                if (title && url && externalArticles.length < 10) {
+                  externalArticles.push({ title, url })
+                  console.log('[google/context] extracted RSS article:', title)
+                }
+              }
+            }
+          } else if (source.source_type === 'blog' || source.source_type === 'website') {
+            // Simple HTML link extraction
+            const linkRegex = /<a[^>]*href=["']([^"']+)["'][^>]*>([^<]+)<\/a>/gi
+            let match
+            let count = 0
+            
+            while ((match = linkRegex.exec(text)) !== null && count < 5) {
+              const url = match[1]
+              const title = match[2].trim()
+              
+              if (title.length > 5 && title.length < 150 && 
+                  !['home', 'about', 'contact', 'menu', 'nav'].some(w => title.toLowerCase().includes(w))) {
+                
+                let absoluteUrl = url
+                if (url.startsWith('/')) {
+                  const baseUrl = new URL(source.url)
+                  absoluteUrl = `${baseUrl.origin}${url}`
+                } else if (!url.startsWith('http')) {
+                  const baseUrl = new URL(source.url)
+                  absoluteUrl = `${baseUrl.origin}/${url}`
+                }
+                
+                if (externalArticles.length < 10) {
+                  externalArticles.push({ title, url: absoluteUrl })
+                  console.log('[google/context] extracted blog article:', title)
+                  count++
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[google/context] failed to fetch from', source.url, ':', e)
+        }
+      }
     }
+    
+    console.log('[google/context] total external articles extracted:', externalArticles.length)
   } catch (e) {
-    console.error('[google/context] failed to fetch external sources:', e)
+    console.error('[google/context] external sources error:', e)
   }
 
   // Combine Drive files and external articles
@@ -321,6 +387,14 @@ export async function POST(req: Request) {
   const driveContext = allContent.length > 0
     ? allContent.map(c => `- ${c.title} (${c.url})`).join('\n')
     : 'No relevant content found.'
+
+  // Log content summary before Claude
+  console.log('[google/context] ========== CONTENT SUMMARY ==========')
+  console.log('[google/context] drive files found:', driveFiles.length)
+  console.log('[google/context] external articles found:', externalArticles.length)
+  console.log('[google/context] total content sources:', driveFiles.length + externalArticles.length)
+  console.log('[google/context] email threads analyzed:', emailSummaries.length)
+  console.log('[google/context] =====================================')
 
   const emailSubjectsStr = emailSummaries.slice(0, 3).join(' | ') || 'No emails found'
   const detectedLanguage = detectLanguage(emailSummaries)
