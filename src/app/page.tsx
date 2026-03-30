@@ -469,6 +469,150 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Pricing Section */}
+      <section className="py-24 px-6 bg-gradient-to-b from-slate-50 to-white">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-slate-900 mb-4">
+              Simple, transparent pricing
+            </h2>
+            <p className="text-lg text-slate-500">
+              Choose the plan that fits your sales workflow
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8 mb-16">
+            {/* Starter Plan */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-8 hover:shadow-lg transition">
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Starter</h3>
+              <div className="mb-6">
+                <span className="text-4xl font-bold text-slate-900">€25</span>
+                <span className="text-slate-500 ml-2">/month</span>
+              </div>
+              <p className="text-slate-600 font-semibold mb-6">5 links/month</p>
+              <button
+                onClick={() => formRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                className="w-full px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-900 font-semibold rounded-lg transition mb-8"
+              >
+                Get early access
+              </button>
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center gap-3">
+                  <IconCheck />
+                  <span className="text-slate-700">5 branded pages/month</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <IconCheck />
+                  <span className="text-slate-700">Basic engagement tracking</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <IconCheck />
+                  <span className="text-slate-700">Email integration</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <IconCheck />
+                  <span className="text-slate-700">Community support</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Pro Plan (Most Popular) */}
+            <div className="bg-white border-2 border-violet-600 rounded-3xl p-8 hover:shadow-lg transition relative">
+              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-violet-600 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                Most popular
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Pro</h3>
+              <div className="mb-6">
+                <span className="text-4xl font-bold text-slate-900">€40</span>
+                <span className="text-slate-500 ml-2">/month</span>
+              </div>
+              <p className="text-slate-600 font-semibold mb-6">Unlimited links + AI</p>
+              <button
+                onClick={() => formRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                className="w-full px-4 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-semibold rounded-lg transition mb-8"
+              >
+                Get early access
+              </button>
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center gap-3">
+                  <IconCheck />
+                  <span className="text-slate-700">Unlimited pages</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <IconCheck />
+                  <span className="text-slate-700">AI-powered intros</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <IconCheck />
+                  <span className="text-slate-700">Advanced engagement scoring</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <IconCheck />
+                  <span className="text-slate-700">Priority support</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Team Plan */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-8 hover:shadow-lg transition">
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Team</h3>
+              <div className="mb-6">
+                <span className="text-4xl font-bold text-slate-900">€35</span>
+                <span className="text-slate-500 ml-2">/user/month (min 3)</span>
+              </div>
+              <p className="text-slate-600 font-semibold mb-6">Everything in Pro + manager dashboard</p>
+              <button
+                onClick={() => formRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                className="w-full px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-900 font-semibold rounded-lg transition mb-8"
+              >
+                Get early access
+              </button>
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center gap-3">
+                  <IconCheck />
+                  <span className="text-slate-700">All Pro features</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <IconCheck />
+                  <span className="text-slate-700">Team manager dashboard</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <IconCheck />
+                  <span className="text-slate-700">Performance analytics</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <IconCheck />
+                  <span className="text-slate-700">Dedicated support</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* FAQ Section */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-12">
+            <h3 className="text-2xl font-bold text-slate-900 mb-8">Frequently asked questions</h3>
+            <div className="space-y-6">
+              <div>
+                <h4 className="font-semibold text-slate-900 mb-2">Can I upgrade or downgrade anytime?</h4>
+                <p className="text-slate-600">Yes. Change your plan at any time, and we'll prorate your billing accordingly.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-slate-900 mb-2">Do you offer discounts for annual billing?</h4>
+                <p className="text-slate-600">We will soon. Join the waitlist and we'll let you know when annual plans are available.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-slate-900 mb-2">Is there a free trial?</h4>
+                <p className="text-slate-600">We&apos;re currently in private beta. Early access users get full feature access to test the platform.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-slate-900 mb-2">What payment methods do you accept?</h4>
+                <p className="text-slate-600">We accept all major credit cards and bank transfers. We'll support more payment methods soon.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Capture Form */}
       <section id="waitlist" ref={formRef} className="py-24 px-6 bg-white">
         <div className="max-w-2xl mx-auto">
