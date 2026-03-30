@@ -246,8 +246,9 @@ export async function POST(req: Request) {
 
     // If not enough results from topics, search by company name
     if (allFiles.length < 3) {
+      console.log('[google/context] company name to search:', company)
       const companyQuery = `name contains '${company}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions} ${invoiceExclusions}`
-      console.log('[google/context] fallback company search:', companyQuery)
+      console.log('[google/context] fallback company search query:', companyQuery)
 
       try {
         const filesRes = await drive.files.list({
@@ -256,30 +257,34 @@ export async function POST(req: Request) {
           pageSize: 50,
           orderBy: 'modifiedTime desc',
         })
-        console.log('[google/context] company search returned:', filesRes.data.files?.length || 0, 'files')
+        const returnedCount = filesRes.data.files?.length || 0
+        console.log('[google/context] company search returned:', returnedCount, 'files')
+        if (returnedCount > 0) {
+          console.log('[google/context] company search files:', filesRes.data.files?.map(f => ({ name: f.name, modified: f.modifiedTime })))
+        }
         allFiles = allFiles.concat(filesRes.data.files || [])
       } catch (e) {
         console.error('[google/context] company search error:', e)
       }
     }
 
-    // If not enough results, search for files modified in last 60 days
+    // If not enough results, search for ANY recent files (most recent first)
     if (allFiles.length < 3) {
-      const sixtyDaysAgo = new Date()
-      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60)
-      const dateStr = sixtyDaysAgo.toISOString().split('T')[0]
-      
-      const recentQuery = `modifiedTime > '${dateStr}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions}`
-      console.log('[google/context] fallback recent files search (60 days):', recentQuery)
+      const recentQuery = `trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions}`
+      console.log('[google/context] fallback: list 5 most recent files. Query:', recentQuery)
       
       try {
         const recentRes = await drive.files.list({
           q: recentQuery,
           fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
-          pageSize: 10,
+          pageSize: 5,
           orderBy: 'modifiedTime desc',
         })
-        console.log('[google/context] recent files search returned:', recentRes.data.files?.length || 0, 'files')
+        const returnedCount = recentRes.data.files?.length || 0
+        console.log('[google/context] recent files search returned:', returnedCount, 'files')
+        if (returnedCount > 0) {
+          console.log('[google/context] recent files returned:', recentRes.data.files?.map(f => ({ name: f.name, modified: f.modifiedTime })))
+        }
         allFiles = allFiles.concat(recentRes.data.files || [])
       } catch (e) {
         console.error('[google/context] recent files search error:', e)

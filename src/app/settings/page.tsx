@@ -220,6 +220,7 @@ export default function SettingsPage() {
     const { error } = await supabaseBrowser
       .from('external_sources')
       .insert({
+        user_id: user?.id,
         source_type: newSourceType,
         url: newSourceUrl,
         title: newSourceTitle || null,
