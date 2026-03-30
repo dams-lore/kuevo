@@ -250,28 +250,35 @@ export default function SettingsPage() {
     }
 
     setAddingSource(true)
-    const { error } = await supabaseBrowser
-      .from('external_sources')
-      .insert({
-        user_id: user?.id,
+    try {
+      const payload = {
         source_type: newSourceType,
         url: newSourceUrl,
         title: newSourceTitle || null,
+      }
+      console.log('[settings] adding external source:', payload, 'user_id:', user?.id)
+      
+      const res = await fetch('/api/external-sources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       })
 
-    if (!error) {
-      setNewSourceUrl('')
-      setNewSourceTitle('')
-      // Reload sources
-      const { data: sources } = await supabaseBrowser
-        .from('external_sources')
-        .select('*')
-        .eq('user_id', user?.id)
-      if (sources) setExternalSources(sources)
-      setMessage('Source added!')
-      setTimeout(() => setMessage(''), 3000)
-    } else {
-      setMessage('Error: ' + error.message)
+      if (res.ok) {
+        setNewSourceUrl('')
+        setNewSourceTitle('')
+        // Reload sources
+        const sourcesRes = await fetch('/api/external-sources')
+        const sourcesData = await sourcesRes.json()
+        if (sourcesData.sources) setExternalSources(sourcesData.sources)
+        setMessage('Source added!')
+        setTimeout(() => setMessage(''), 3000)
+      } else {
+        const errData = await res.json()
+        setMessage('Error: ' + (errData.error || 'Failed to add source'))
+      }
+    } catch (e) {
+      setMessage('Error: ' + (e instanceof Error ? e.message : 'Failed to add source'))
     }
     setAddingSource(false)
   }
@@ -279,17 +286,21 @@ export default function SettingsPage() {
   async function handleDeleteExternalSource(sourceId: string) {
     if (!window.confirm('Delete this source?')) return
 
-    const { error } = await supabaseBrowser
-      .from('external_sources')
-      .delete()
-      .eq('id', sourceId)
+    try {
+      const res = await fetch(`/api/external-sources?id=${sourceId}`, {
+        method: 'DELETE',
+      })
 
-    if (!error) {
-      setExternalSources(externalSources.filter(s => s.id !== sourceId))
-      setMessage('Source deleted')
-      setTimeout(() => setMessage(''), 3000)
-    } else {
-      setMessage('Error: ' + error.message)
+      if (res.ok) {
+        setExternalSources(externalSources.filter(s => s.id !== sourceId))
+        setMessage('Source deleted')
+        setTimeout(() => setMessage(''), 3000)
+      } else {
+        const errData = await res.json()
+        setMessage('Error: ' + (errData.error || 'Failed to delete source'))
+      }
+    } catch (e) {
+      setMessage('Error: ' + (e instanceof Error ? e.message : 'Failed to delete source'))
     }
   }
 

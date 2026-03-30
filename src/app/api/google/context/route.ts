@@ -220,75 +220,38 @@ export async function POST(req: Request) {
       .map(k => `and not name contains "${k}"`)
       .join(' ')
 
-    // Search by email topics first (most relevant)
-    console.log('[google/context] starting drive search with', uniqueTopics.length, 'topics')
-    for (const topic of uniqueTopics) {
-      if (topic) {
-        const topicQuery = `name contains '${topic}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions} ${invoiceExclusions}`
-        console.log('[google/context] drive topic query:', topicQuery)
-        
-        try {
-          const topicRes = await drive.files.list({
-            q: topicQuery,
-            fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
-            pageSize: 10,
-            orderBy: 'modifiedTime desc',
-          })
-          console.log('[google/context] topic search returned:', topicRes.data.files?.length || 0, 'files')
-          allFiles = allFiles.concat(topicRes.data.files || [])
-        } catch (e) {
-          console.error('[google/context] topic search error:', e)
-        }
-      }
-    }
+    // Search by company name using fullText (better matching)
+    console.log('[google/context] searching drive for company:', company)
+    const companyQuery = `fullText contains '${company}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions} ${invoiceExclusions}`
+    console.log('[google/context] company fullText search query:', companyQuery)
 
-    console.log('[google/context] drive files found with email topics:', allFiles.length)
-
-    // If not enough results from topics, search by company name
-    if (allFiles.length < 3) {
-      console.log('[google/context] company name to search:', company)
-      const companyQuery = `name contains '${company}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions} ${invoiceExclusions}`
-      console.log('[google/context] fallback company search query:', companyQuery)
-
-      try {
-        const filesRes = await drive.files.list({
-          q: companyQuery,
-          fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
-          pageSize: 50,
-          orderBy: 'modifiedTime desc',
-        })
-        const returnedCount = filesRes.data.files?.length || 0
-        console.log('[google/context] company search returned:', returnedCount, 'files')
-        if (returnedCount > 0) {
-          console.log('[google/context] company search files:', filesRes.data.files?.map(f => ({ name: f.name, modified: f.modifiedTime })))
-        }
-        allFiles = allFiles.concat(filesRes.data.files || [])
-      } catch (e) {
-        console.error('[google/context] company search error:', e)
-      }
-    }
-
-    // If not enough results, search for ANY recent files (most recent first)
-    if (allFiles.length < 3) {
-      const recentQuery = `trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions}`
-      console.log('[google/context] fallback: list 5 most recent files. Query:', recentQuery)
+    try {
+      const filesRes = await drive.files.list({
+        q: companyQuery,
+        fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
+        pageSize: 10,
+        orderBy: 'modifiedTime desc',
+      })
       
-      try {
-        const recentRes = await drive.files.list({
-          q: recentQuery,
-          fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
-          pageSize: 5,
-          orderBy: 'modifiedTime desc',
-        })
-        const returnedCount = recentRes.data.files?.length || 0
-        console.log('[google/context] recent files search returned:', returnedCount, 'files')
-        if (returnedCount > 0) {
-          console.log('[google/context] recent files returned:', recentRes.data.files?.map(f => ({ name: f.name, modified: f.modifiedTime })))
-        }
-        allFiles = allFiles.concat(recentRes.data.files || [])
-      } catch (e) {
-        console.error('[google/context] recent files search error:', e)
+      console.log('[google/context] raw drive API response:', JSON.stringify({
+        kind: filesRes.data.kind,
+        files_count: filesRes.data.files?.length || 0,
+        files: filesRes.data.files?.map(f => ({ id: f.id, name: f.name, mimeType: f.mimeType, webViewLink: f.webViewLink?.substring(0, 50) })) || [],
+        nextPageToken: filesRes.data.nextPageToken || 'none',
+      }))
+      
+      const returnedCount = filesRes.data.files?.length || 0
+      console.log('[google/context] company fullText search returned:', returnedCount, 'files')
+      if (returnedCount > 0) {
+        console.log('[google/context] company search files:', filesRes.data.files?.map(f => ({ name: f.name, modified: f.modifiedTime })))
       }
+      allFiles = allFiles.concat(filesRes.data.files || [])
+    } catch (e) {
+      console.error('[google/context] company fullText search error:', e instanceof Error ? e.message : String(e))
+    }
+
+    if (allFiles.length === 0) {
+      console.log('[google/context] no drive files found for company:', company, '- user will see empty content message')
     }
 
     console.log('[google/context] total files after fallback:', allFiles.length)
@@ -506,11 +469,16 @@ Respond ONLY with valid JSON, no markdown:
     console.log('[google/context] claude suggested_blocks:', result.suggested_blocks)
     console.log('[google/context] after filtering:', filtered)
     
+    const noContentMessage = driveFiles.length === 0 && externalArticles.length === 0
+      ? 'No content found for this contact. Add links manually or configure your content sources in Settings.'
+      : undefined
+
     return NextResponse.json({
       intro: result.intro,
       suggested_blocks: filtered,
       email_subjects: emailSubjectsStr,
       detected_language: detectedLanguage,
+      message: noContentMessage,
       debug: {
         emails_found: emailSummaries.length,
         email_topics_extracted: uniqueTopics.length,

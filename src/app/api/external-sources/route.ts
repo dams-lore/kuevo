@@ -44,6 +44,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
   }
 
+  console.log('[external-sources POST] inserting source for user:', session.user.id, 'source_type:', source_type, 'url:', url)
+
   const { data, error } = await supabase
     .from('external_sources')
     .insert({
@@ -54,6 +56,8 @@ export async function POST(req: Request) {
     })
     .select()
     .single()
+
+  console.log('[external-sources POST] insert result - error:', error?.message || 'none', 'data:', data?.id || 'no data')
 
   if (error) {
     console.error('[external-sources] insert error:', error)
