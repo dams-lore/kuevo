@@ -79,6 +79,7 @@ export default function SettingsPage() {
   const [loadingFolders, setLoadingFolders] = useState(false)
   const [folderSearchQuery, setFolderSearchQuery] = useState('')
   const [googleConnected, setGoogleConnected] = useState(false)
+  const [hubspotConnected, setHubspotConnected] = useState(false)
   const [externalSources, setExternalSources] = useState<any[]>([])
   const [newSourceUrl, setNewSourceUrl] = useState('')
   const [newSourceTitle, setNewSourceTitle] = useState('')
@@ -96,15 +97,27 @@ export default function SettingsPage() {
       setUser(authUser)
 
       // Check Google integration
-      const { data: integration } = await supabaseBrowser
+      const { data: googleIntegration } = await supabaseBrowser
         .from('integrations')
         .select('*')
         .eq('user_id', authUser.id)
         .eq('provider', 'google')
         .single()
 
-      if (integration?.access_token) {
+      if (googleIntegration?.access_token) {
         setGoogleConnected(true)
+      }
+
+      // Check HubSpot integration
+      const { data: hubspotIntegration } = await supabaseBrowser
+        .from('integrations')
+        .select('*')
+        .eq('user_id', authUser.id)
+        .eq('provider', 'hubspot')
+        .single()
+
+      if (hubspotIntegration?.access_token) {
+        setHubspotConnected(true)
       }
 
       // Check if user profile exists, if not create one
@@ -197,6 +210,26 @@ export default function SettingsPage() {
     if (!error) {
       setGoogleConnected(false)
       setMessage('Google account disconnected')
+      setTimeout(() => setMessage(''), 3000)
+    } else {
+      setMessage('Error disconnecting: ' + error.message)
+    }
+  }
+
+  async function handleDisconnectHubSpot() {
+    if (!user) return
+    const confirmed = window.confirm('Disconnect HubSpot account?')
+    if (!confirmed) return
+
+    const { error } = await supabaseBrowser
+      .from('integrations')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('provider', 'hubspot')
+
+    if (!error) {
+      setHubspotConnected(false)
+      setMessage('HubSpot account disconnected')
       setTimeout(() => setMessage(''), 3000)
     } else {
       setMessage('Error disconnecting: ' + error.message)
@@ -355,6 +388,36 @@ export default function SettingsPage() {
               </div>
             )}
             <p className="text-xs text-gray-500 mt-2">Required to search Gmail contacts and Drive files</p>
+          </div>
+
+          {/* HubSpot Integration */}
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">CRM Integration</h2>
+            {hubspotConnected ? (
+              <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-green-600 text-lg">✓</span>
+                  <span className="text-sm text-green-700 font-medium">HubSpot connected</span>
+                </div>
+                <button
+                  onClick={handleDisconnectHubSpot}
+                  className="text-xs text-red-600 hover:text-red-800 underline"
+                >
+                  Disconnect
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <span className="text-sm text-gray-600">Not connected</span>
+                <a
+                  href="/api/auth/hubspot"
+                  className="text-xs px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition"
+                >
+                  Connect HubSpot
+                </a>
+              </div>
+            )}
+            <p className="text-xs text-gray-500 mt-2">Connect HubSpot to sync prospect activities and notes</p>
           </div>
 
           {/* External Content Sources */}
