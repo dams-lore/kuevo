@@ -290,7 +290,6 @@ export async function POST(req: Request) {
         console.error('[google/context] recent files search error:', e)
       }
     }
-    }
 
     console.log('[google/context] total files after fallback:', allFiles.length)
 
