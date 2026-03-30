@@ -34,6 +34,9 @@ export default function CreatePage() {
   // Section 2: Intro message
   const [introMessage, setIntroMessage] = useState('')
   const [generatingIntro, setGeneratingIntro] = useState(false)
+  const [transcriptAdded, setTranscriptAdded] = useState(false)
+  const [transcriptAnalysis, setTranscriptAnalysis] = useState<any>(null)
+  const [uploadingTranscript, setUploadingTranscript] = useState(false)
 
   // Section 3: Content
   const [blocks, setBlocks] = useState<Block[]>([])
@@ -161,7 +164,7 @@ export default function CreatePage() {
       const res = await fetch('/api/generate-intro', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prospect_name: prospectName, company, email_context: emailContext }),
+        body: JSON.stringify({ prospect_name: prospectName, company, email_context: emailContext, transcript_analysis: transcriptAnalysis }),
       })
       const data = await res.json()
       if (data.intro) {
@@ -174,6 +177,44 @@ export default function CreatePage() {
       toast.error('Error generating intro')
     } finally {
       setGeneratingIntro(false)
+    }
+  }
+
+  async function handleTranscriptUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    const allowedTypes = ['text/plain', 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please upload .txt, .pdf, or .docx file')
+      return
+    }
+
+    setUploadingTranscript(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const res = await fetch('/api/transcript/analyze', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await res.json()
+      if (data.success && data.analysis) {
+        setTranscriptAnalysis(data.analysis)
+        setTranscriptAdded(true)
+        toast.success('Transcript added! AI extracted key topics and pain points.')
+      } else {
+        toast.error(data.error || 'Failed to analyze transcript')
+      }
+    } catch (e) {
+      toast.error('Error uploading transcript')
+    } finally {
+      setUploadingTranscript(false)
+      // Reset input
+      e.target.value = ''
     }
   }
 
@@ -432,6 +473,29 @@ export default function CreatePage() {
               >
                 {generatingIntro ? 'Generating...' : '✨ Generate with AI'}
               </button>
+
+              {/* Transcript upload */}
+              <div className="relative">
+                <input
+                  type="file"
+                  accept=".txt,.pdf,.docx"
+                  onChange={handleTranscriptUpload}
+                  disabled={uploadingTranscript}
+                  className="hidden"
+                  id="transcript-upload"
+                />
+                <label
+                  htmlFor="transcript-upload"
+                  className="block text-sm text-violet-600 hover:text-violet-800 cursor-pointer underline"
+                >
+                  {uploadingTranscript ? 'Uploading...' : 'Want more context? Import transcript →'}
+                </label>
+                {transcriptAdded && (
+                  <span className="inline-block ml-2 text-xs text-green-600 font-medium">
+                    ✓ Transcript added
+                  </span>
+                )}
+              </div>
 
               <textarea
                 rows={4}
