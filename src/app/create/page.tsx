@@ -85,7 +85,12 @@ export default function CreatePage() {
     try {
       const res = await fetch('/api/contacts/search?q=' + encodeURIComponent(value))
       const data = await res.json()
-      setContactMatches(data.matches || [])
+      // API returns 'contacts', not 'matches'
+      const matches = data.contacts?.map((c: any) => ({
+        email: c.email,
+        name: c.name || c.email,
+      })) || []
+      setContactMatches(matches)
       setShowContactDropdown(true)
     } catch (e) {
       console.error('[create] contact search error:', e)
