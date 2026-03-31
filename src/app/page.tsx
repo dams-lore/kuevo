@@ -295,7 +295,7 @@ export default function Home() {
                 <div key={i} className={`w-7 h-7 rounded-full border-2 border-white ${c}`} />
               ))}
             </div>
-            <span>Join 200+ sales teams on the waitlist</span>
+            <span>Join 200+ account teams on the waitlist</span>
           </div>
         </div>
       </section>
@@ -668,7 +668,7 @@ export default function Home() {
               your follow-up
             </h2>
             <p className="mt-4 text-lg text-slate-500">
-              We&apos;re onboarding sales teams in waves. Join the waitlist and we&apos;ll reach out soon.
+              We&apos;re onboarding account teams in waves. Join the waitlist and we&apos;ll reach out soon.
             </p>
           </div>
 
