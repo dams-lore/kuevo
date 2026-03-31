@@ -201,7 +201,7 @@ export default function SettingsPage() {
     if (!user) return
     try {
       await supabaseBrowser
-        .from('profiles')
+        .from('user_profiles')
         .update({ onboarding_completed: true })
         .eq('id', user.id)
       console.log('[settings] onboarding marked complete')

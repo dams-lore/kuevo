@@ -57,7 +57,7 @@ export default function AuthCallbackPage() {
             // Mark onboarding as complete (user connected Google)
             try {
               await supabaseBrowser
-                .from('profiles')
+                .from('user_profiles')
                 .update({ onboarding_completed: true })
                 .eq('id', session.user.id)
               console.log('[auth/callback] onboarding marked complete')

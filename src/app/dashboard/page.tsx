@@ -13,7 +13,7 @@ export default async function DashboardPage() {
 
   // Get onboarding status
   const { data: profile } = await supabase
-    .from('profiles')
+    .from('user_profiles')
     .select('onboarding_completed')
     .eq('id', session.user.id)
     .single()
