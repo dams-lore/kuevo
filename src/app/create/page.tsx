@@ -29,6 +29,7 @@ export default function CreatePage() {
   // ─── Part 2: Context
   const [emailContext, setEmailContext] = useState('')
   const [emailsFound, setEmailsFound] = useState(0)
+  const [extractedKeywords, setExtractedKeywords] = useState<string[]>([])
   const [freeTextContext, setFreeTextContext] = useState('')
   const [transcriptAdded, setTranscriptAdded] = useState(false)
   const [transcriptAnalysis, setTranscriptAnalysis] = useState<any>(null)
@@ -122,10 +123,12 @@ export default function CreatePage() {
       if (data.email_subjects) {
         setEmailContext(data.email_subjects)
         setEmailsFound(data.debug?.emails_found || 0)
+        setExtractedKeywords(data.extracted_keywords || [])
         setDetectedLanguage(data.detected_language || 'English')
-        toast.success(`Found ${data.debug?.emails_found || 0} emails`)
+        toast.success(`Found ${data.debug?.emails_found || 0} emails with ${(data.extracted_keywords || []).length} keywords`)
       } else {
         setEmailsFound(0)
+        setExtractedKeywords([])
         toast.info('No emails found for this company')
       }
     } catch (e) {
@@ -472,12 +475,27 @@ export default function CreatePage() {
               <button
                 onClick={handleFetchEmails}
                 disabled={fetchingEmails || !googleConnected || !company}
-                className="w-full px-3 py-2 text-sm bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg transition disabled:opacity-50 font-medium mb-2"
+                className="w-full px-3 py-2 text-sm bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg transition disabled:opacity-50 font-medium mb-3"
               >
                 {fetchingEmails ? 'Fetching...' : 'Fetch from emails'}
               </button>
+              
               {emailsFound > 0 && (
-                <p className="text-xs text-green-600 font-medium">✓ {emailsFound} emails found for {company}</p>
+                <div className="mb-3">
+                  <p className="text-xs text-green-600 font-medium mb-2">✓ {emailsFound} emails found</p>
+                  {extractedKeywords.length > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-600 font-semibold mb-1">Topics identified:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {extractedKeywords.map((keyword, i) => (
+                          <span key={i} className="px-2 py-1 bg-violet-100 text-violet-700 text-xs rounded-full font-medium">
+                            {keyword}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
               {emailContext && !emailsFound && (
                 <p className="text-xs text-gray-500">Context loaded</p>

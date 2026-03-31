@@ -220,25 +220,33 @@ export async function POST(req: Request) {
       .map(k => `and not name contains "${k}"`)
       .join(' ')
 
-    // Search by company name using name contains (simpler matching)
-    console.log('[google/context] searching drive for company:', company)
-    const companyQuery = `name contains '${company}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions} ${invoiceExclusions}`
-    console.log('[google/context] company name search query:', companyQuery)
+    // Search using email keywords (much better than company name)
+    console.log('[google/context] extracted keywords from emails:', uniqueTopics)
+    
+    // If we have keywords, search for them
+    let driveQuery = ''
+    if (uniqueTopics.length > 0) {
+      // Build query with keywords: (keyword1 OR keyword2 OR keyword3)
+      const keywordConditions = uniqueTopics.slice(0, 5).map(k => `name contains '${k}'`).join(' OR ')
+      driveQuery = `(${keywordConditions}) and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions} ${invoiceExclusions}`
+    } else {
+      // Fallback: search by company name if no keywords
+      driveQuery = `name contains '${company}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions} ${invoiceExclusions}`
+    }
+    
+    console.log('[google/context] drive search query:', driveQuery)
 
     try {
       const filesRes = await drive.files.list({
-        q: companyQuery,
+        q: driveQuery,
         fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
         pageSize: 20,
         orderBy: 'modifiedTime desc',
       })
       
       console.log('[google/context] raw drive API response:', JSON.stringify({
-        query: companyQuery,
-        kind: filesRes.data.kind,
         files_count: filesRes.data.files?.length || 0,
-        files: filesRes.data.files?.map(f => ({ id: f.id, name: f.name, mimeType: f.mimeType, webViewLink: f.webViewLink?.substring(0, 50) })) || [],
-        nextPageToken: filesRes.data.nextPageToken || 'none',
+        files: filesRes.data.files?.map(f => ({ id: f.id, name: f.name, mimeType: f.mimeType })) || [],
       }))
       
       const returnedCount = filesRes.data.files?.length || 0
@@ -480,6 +488,7 @@ Respond ONLY with valid JSON, no markdown:
       email_subjects: emailSubjectsStr,
       detected_language: detectedLanguage,
       message: noContentMessage,
+      extracted_keywords: uniqueTopics,
       debug: {
         emails_found: emailSummaries.length,
         email_topics_extracted: uniqueTopics.length,
