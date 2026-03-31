@@ -19,7 +19,7 @@ export default async function DashboardPage() {
     .single()
 
   // Show onboarding if: profile doesn't exist, column doesn't exist, or flag is false
-  const showOnboarding = !profile?.onboarding_completed ?? true
+  const showOnboarding = profile?.onboarding_completed === false || !profile
 
   return (
     <>
