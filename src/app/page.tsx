@@ -350,7 +350,7 @@ export default function Home() {
           <div className="text-center mb-16">
             <span className="text-sm font-semibold text-violet-600 uppercase tracking-widest">The problem</span>
             <h2 className="mt-3 text-4xl font-bold text-slate-900">
-              Sales follow-up is broken
+              Account follow-up is broken
             </h2>
             <p className="mt-4 text-lg text-slate-500 max-w-xl mx-auto">
               You just had a great call. Now comes the part nobody talks about.
