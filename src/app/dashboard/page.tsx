@@ -12,13 +12,16 @@ export default async function DashboardPage() {
   }
 
   // Get onboarding status
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('user_profiles')
     .select('onboarding_completed')
     .eq('id', session.user.id)
     .single()
 
-  const showOnboarding = !profile?.onboarding_completed
+  // Show onboarding if: profile doesn't exist, column doesn't exist, or flag is false
+  const showOnboarding = !profile?.onboarding_completed ?? true
+  
+  console.log('[dashboard] profile:', profile, 'error:', profileError?.message, 'showOnboarding:', showOnboarding)
 
   return (
     <>

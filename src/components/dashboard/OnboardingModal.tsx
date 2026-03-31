@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface OnboardingModalProps {
@@ -10,6 +10,10 @@ interface OnboardingModalProps {
 export default function OnboardingModal({ show }: OnboardingModalProps) {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(show)
+
+  useEffect(() => {
+    setIsOpen(show)
+  }, [show])
 
   if (!isOpen) {
     return null
