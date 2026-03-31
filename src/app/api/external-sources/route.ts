@@ -31,7 +31,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { source_type, url, title } = await req.json()
+  const body = await req.json()
+  const { source_type, url, title } = body
 
   if (!source_type || !url) {
     return NextResponse.json({ error: 'source_type and url are required' }, { status: 400 })
@@ -44,8 +45,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
   }
 
-  console.log('[external-sources POST] request body:', { source_type, url, title })
-  console.log('[external-sources POST] session user_id:', session.user.id)
+  console.log('[external-sources POST] user_id:', session.user.id, 'body:', body)
   console.log('[external-sources POST] inserting source for user:', session.user.id, 'source_type:', source_type, 'url:', url)
 
   const { data, error } = await supabase
