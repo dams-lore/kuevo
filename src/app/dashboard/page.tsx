@@ -20,8 +20,6 @@ export default async function DashboardPage() {
 
   // Show onboarding if: profile doesn't exist, column doesn't exist, or flag is false
   const showOnboarding = !profile?.onboarding_completed ?? true
-  
-  console.log('[dashboard] profile:', profile, 'error:', profileError?.message, 'showOnboarding:', showOnboarding)
 
   return (
     <>
