@@ -266,16 +266,14 @@ export default function Home() {
           </div>
 
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-tight mb-6 animate-fade-in-up animation-delay-100">
-            Share the right docs,{' '}
+            The content was there. The{' '}
             <span className="bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 bg-clip-text text-transparent">
-              at the right time,
-            </span>{' '}
-            automatically
+              follow-up never happened.
+            </span>
           </h1>
 
           <p className="text-xl text-slate-500 max-w-2xl mx-auto mb-10 leading-relaxed animate-fade-in-up animation-delay-200">
-            Kuevo connects your Google Drive, Gmail and SharePoint to automatically assemble a branded,
-            tracked sharing page — zero upload, zero effort.
+            Kuevo connects to your emails, Drive and CRM to build a personalized, tracked sharing page in seconds — so the right content reaches the right person, every time.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up animation-delay-300">
@@ -298,6 +296,50 @@ export default function Home() {
               ))}
             </div>
             <span>Join 200+ sales teams on the waitlist</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Personas */}
+      <section className="py-24 px-6 bg-white">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-slate-900 mb-4">
+              Built for every customer-facing role
+            </h2>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8 mb-8">
+            {[
+              {
+                title: 'Account Executive',
+                icon: '💼',
+                desc: 'After your discovery call, your prospect is waiting for the content you promised. Kuevo reads your email history, finds the right files in your Drive, and builds a branded page ready to send — in under 2 minutes. No more "I\'ll send that over" that never happens.',
+              },
+              {
+                title: 'Sales & SDR',
+                icon: '🎯',
+                desc: 'Stop spending 20 minutes building follow-up emails. Kuevo assembles a personalized sharing page from your Drive and Gmail history — with tracking so you know the exact moment to call back.',
+              },
+              {
+                title: 'Customer Success Manager',
+                icon: '🤝',
+                desc: 'Onboarding a new user, rolling out a new feature, driving adoption — every touchpoint deserves the right content. Kuevo pulls your enablement library and builds a tailored page for each customer. You\'ll know what they read, what they ignored, and when to follow up.',
+              },
+            ].map((persona, i) => (
+              <div
+                key={i}
+                className="bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 rounded-3xl p-8 text-white shadow-lg hover:shadow-xl transition-shadow"
+              >
+                <div className="text-4xl mb-4">{persona.icon}</div>
+                <h3 className="text-xl font-bold mb-4">{persona.title}</h3>
+                <p className="text-white/90 text-sm leading-relaxed">{persona.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="text-center text-slate-600 text-sm">
+            <p>No upload. No copy-paste. Connect your Google or Microsoft account — Kuevo finds the content and builds the page.</p>
           </div>
         </div>
       </section>
