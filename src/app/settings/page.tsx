@@ -265,20 +265,26 @@ export default function SettingsPage() {
       })
 
       if (res.ok) {
+        console.log('[settings] source added successfully')
         setNewSourceUrl('')
         setNewSourceTitle('')
         // Reload sources
         const sourcesRes = await fetch('/api/external-sources')
         const sourcesData = await sourcesRes.json()
+        console.log('[settings] reloaded sources:', sourcesData.sources?.length || 0, 'sources')
         if (sourcesData.sources) setExternalSources(sourcesData.sources)
         setMessage('Source added!')
         setTimeout(() => setMessage(''), 3000)
       } else {
         const errData = await res.json()
+        console.log('[settings] source add failed:', errData)
         setMessage('Error: ' + (errData.error || 'Failed to add source'))
       }
     } catch (e) {
+      console.log('[settings] source add error:', e)
       setMessage('Error: ' + (e instanceof Error ? e.message : 'Failed to add source'))
+    } finally {
+      setAddingSource(false)
     }
     setAddingSource(false)
   }

@@ -32,11 +32,17 @@ export async function POST(req: Request) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { prospect_name, company, email_context, transcript_analysis } = await req.json()
+  const { prospect_name, company, email_context, free_text_context, transcript_analysis } = await req.json()
 
   // Detect language from email context if provided, otherwise default to English
   const detectedLanguage = email_context ? detectLanguageFromContent(email_context) : 'English'
   console.log('[generate-intro] detected language:', detectedLanguage)
+
+  // Build free text context if available
+  let freeTextPart = ''
+  if (free_text_context) {
+    freeTextPart = `\nContext from user:\n${free_text_context}`
+  }
 
   // Build transcript context if available
   let transcriptContext = ''
@@ -47,9 +53,7 @@ export async function POST(req: Request) {
 ADDITIONAL CONTEXT FROM MEETING TRANSCRIPT:
 - Topics discussed: ${key_topics?.join(', ') || 'none'}
 - Pain points mentioned: ${pain_points?.join(', ') || 'none'}
-- Interests expressed: ${interests?.join(', ') || 'none'}
-
-Use this to make the intro even more personalized and relevant.`
+- Interests expressed: ${interests?.join(', ') || 'none'}`
   }
 
   const message = await anthropic.messages.create({
@@ -65,7 +69,7 @@ Line 2: One sentence explaining what's in the page and why it's relevant for the
 Context:
 - Name: ${prospect_name}
 - Company: ${company}
-${email_context ? `- Recent email context: ${email_context}` : ''}${transcriptContext}
+${email_context ? `- Email context: ${email_context.substring(0, 200)}` : ''}${freeTextPart}${transcriptContext}
 
 Respond ONLY in ${detectedLanguage}. No greetings, no signature, no extra text. Just 2 lines.`
     }]

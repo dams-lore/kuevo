@@ -44,6 +44,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
   }
 
+  console.log('[external-sources POST] request body:', { source_type, url, title })
+  console.log('[external-sources POST] session user_id:', session.user.id)
   console.log('[external-sources POST] inserting source for user:', session.user.id, 'source_type:', source_type, 'url:', url)
 
   const { data, error } = await supabase
@@ -57,13 +59,12 @@ export async function POST(req: Request) {
     .select()
     .single()
 
-  console.log('[external-sources POST] insert result - error:', error?.message || 'none', 'data:', data?.id || 'no data')
-
   if (error) {
-    console.error('[external-sources] insert error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[external-sources POST] insert error:', error.message, 'code:', error.code)
+    return NextResponse.json({ error: error.message, code: error.code }, { status: 500 })
   }
 
+  console.log('[external-sources POST] insert success - id:', data?.id, 'user_id:', data?.user_id)
   return NextResponse.json({ source: data })
 }
 
