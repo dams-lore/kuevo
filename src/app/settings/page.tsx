@@ -196,6 +196,20 @@ export default function SettingsPage() {
     }
   }
 
+  // Mark onboarding as complete (called when user connects a source)
+  async function completeOnboarding() {
+    if (!user) return
+    try {
+      await supabaseBrowser
+        .from('profiles')
+        .update({ onboarding_completed: true })
+        .eq('id', user.id)
+      console.log('[settings] onboarding marked complete')
+    } catch (e) {
+      console.error('[settings] failed to mark onboarding complete:', e)
+    }
+  }
+
   async function handleDisconnectGoogle() {
     if (!user) return
     const confirmed = window.confirm('Disconnect Google account? You will need to reconnect to use Gmail and Drive features.')

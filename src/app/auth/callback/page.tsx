@@ -53,6 +53,17 @@ export default function AuthCallbackPage() {
             console.error('[auth/callback] error saving token:', upsertError)
           } else {
             console.log('[auth/callback] provider token saved successfully')
+            
+            // Mark onboarding as complete (user connected Google)
+            try {
+              await supabaseBrowser
+                .from('profiles')
+                .update({ onboarding_completed: true })
+                .eq('id', session.user.id)
+              console.log('[auth/callback] onboarding marked complete')
+            } catch (e) {
+              console.warn('[auth/callback] failed to mark onboarding complete:', e)
+            }
           }
         } else {
           console.warn('[auth/callback] no provider_token in session')
