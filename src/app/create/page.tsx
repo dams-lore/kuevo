@@ -13,6 +13,7 @@ interface Block {
 interface ContactMatch {
   email: string
   name?: string
+  company?: string
 }
 
 export default function CreatePage() {
@@ -89,6 +90,7 @@ export default function CreatePage() {
       const matches = data.contacts?.map((c: any) => ({
         email: c.email,
         name: c.name || c.email,
+        company: c.company,
       })) || []
       setContactMatches(matches)
       setShowContactDropdown(true)
@@ -416,6 +418,9 @@ export default function CreatePage() {
                         onClick={() => {
                           setProspectName(match.name || match.email)
                           setContactEmail(match.email)
+                          if (match.company) {
+                            setCompany(match.company)
+                          }
                           setShowContactDropdown(false)
                         }}
                         className="w-full text-left px-4 py-2 hover:bg-violet-50 text-sm text-gray-700 border-b border-gray-100 last:border-b-0"

@@ -220,20 +220,21 @@ export async function POST(req: Request) {
       .map(k => `and not name contains "${k}"`)
       .join(' ')
 
-    // Search by company name using fullText (better matching)
+    // Search by company name using name contains (simpler matching)
     console.log('[google/context] searching drive for company:', company)
-    const companyQuery = `fullText contains '${company}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions} ${invoiceExclusions}`
-    console.log('[google/context] company fullText search query:', companyQuery)
+    const companyQuery = `name contains '${company}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions} ${invoiceExclusions}`
+    console.log('[google/context] company name search query:', companyQuery)
 
     try {
       const filesRes = await drive.files.list({
         q: companyQuery,
         fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
-        pageSize: 10,
+        pageSize: 20,
         orderBy: 'modifiedTime desc',
       })
       
       console.log('[google/context] raw drive API response:', JSON.stringify({
+        query: companyQuery,
         kind: filesRes.data.kind,
         files_count: filesRes.data.files?.length || 0,
         files: filesRes.data.files?.map(f => ({ id: f.id, name: f.name, mimeType: f.mimeType, webViewLink: f.webViewLink?.substring(0, 50) })) || [],
@@ -241,7 +242,7 @@ export async function POST(req: Request) {
       }))
       
       const returnedCount = filesRes.data.files?.length || 0
-      console.log('[google/context] company fullText search returned:', returnedCount, 'files')
+      console.log('[google/context] company name search returned:', returnedCount, 'files')
       if (returnedCount > 0) {
         console.log('[google/context] company search files:', filesRes.data.files?.map(f => ({ name: f.name, modified: f.modifiedTime })))
       }
