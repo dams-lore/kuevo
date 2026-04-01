@@ -270,7 +270,7 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
     let driveQuery = ''
     if (uniqueTopics.length > 0) {
       // Build query with keywords: (keyword1 OR keyword2 OR keyword3)
-      const keywordConditions = uniqueTopics.slice(0, 5).map(k => `name contains '${k}'`).join(' OR ')
+      const keywordConditions = uniqueTopics.slice(0, 5).map((k: string) => `name contains '${k}'`).join(' OR ')
       driveQuery = `(${keywordConditions}) and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions} ${invoiceExclusions}`
     } else {
       // Fallback: search by company name if no keywords
