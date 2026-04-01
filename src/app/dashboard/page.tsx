@@ -12,14 +12,14 @@ export default async function DashboardPage() {
   }
 
   // Get onboarding status
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile } = await supabase
     .from('user_profiles')
     .select('onboarding_completed')
     .eq('id', session.user.id)
     .single()
 
-  // Show onboarding if: profile doesn't exist, column doesn't exist, or flag is false
-  const showOnboarding = profile?.onboarding_completed === false || !profile
+  // Show onboarding if: profile doesn't exist OR onboarding_completed is false or null
+  const showOnboarding = !profile || profile.onboarding_completed === false || profile.onboarding_completed === null
 
   return (
     <>
