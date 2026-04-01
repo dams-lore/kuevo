@@ -273,24 +273,45 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
       for (const keyword of uniqueTopics.slice(0, 5)) {
         try {
           const keywordQuery = `fullText contains '${keyword}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions} ${invoiceExclusions}`
-          console.log('[google/context] searching for keyword:', keyword)
+          console.log('[drive] search query:', keywordQuery)
           
-          const filesRes = await drive.files.list({
-            q: keywordQuery,
-            fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
-            pageSize: 10,
-            orderBy: 'modifiedTime desc',
-          })
-          
-          const count = filesRes.data.files?.length || 0
-          console.log('[google/context] keyword search for', keyword, 'returned:', count, 'files')
-          
-          // Add to map (deduplicate by ID)
-          filesRes.data.files?.forEach((f: any) => {
-            if (!fileMap.has(f.id!)) {
-              fileMap.set(f.id!, f)
+          try {
+            const filesRes = await drive.files.list({
+              q: keywordQuery,
+              fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
+              pageSize: 10,
+              orderBy: 'modifiedTime desc',
+            })
+            
+            const count = filesRes.data.files?.length || 0
+            console.log('[drive] results:', count, 'files for keyword:', keyword)
+            if (count === 0) {
+              console.log('[drive] no results - trying simpler query with name contains instead')
+              // Fallback: try simpler name contains query
+              const simpleQuery = `name contains '${keyword}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions}`
+              console.log('[drive] fallback query:', simpleQuery)
+              const simpleRes = await drive.files.list({
+                q: simpleQuery,
+                fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
+                pageSize: 10,
+              })
+              const simpleCount = simpleRes.data.files?.length || 0
+              console.log('[drive] fallback results:', simpleCount, 'files')
+              simpleRes.data.files?.forEach((f: any) => {
+                if (!fileMap.has(f.id!)) {
+                  fileMap.set(f.id!, f)
+                }
+              })
             }
-          })
+            
+            filesRes.data.files?.forEach((f: any) => {
+              if (!fileMap.has(f.id!)) {
+                fileMap.set(f.id!, f)
+              }
+            })
+          } catch (driveError) {
+            console.error('[drive] API error for keyword', keyword, ':', driveError instanceof Error ? driveError.message : String(driveError))
+          }
         } catch (e) {
           console.error('[google/context] keyword search error for', keyword, ':', e instanceof Error ? e.message : String(e))
         }
@@ -332,10 +353,15 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
   // Fetch from external sources (user-configured blogs/RSS)
   let externalArticles: Array<{ title: string; url: string }> = []
   try {
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const userId = user?.id || session.user.id
+    
+    console.log('[context] fetching external sources for user:', userId)
+    
     const { data: sources, error: sourcesError } = await supabase
       .from('external_sources')
       .select('*')
-      .eq('user_id', session.user.id)
+      .eq('user_id', userId)
 
     console.log('[google/context] external_sources query - found:', sources?.length || 0, 'sources, error:', sourcesError?.message || 'none')
     
