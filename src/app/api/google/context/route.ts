@@ -263,62 +263,54 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
       .map(k => `and not name contains "${k}"`)
       .join(' ')
 
-    // Search using email keywords (much better than company name)
-    console.log('[google/context] extracted keywords from emails:', uniqueTopics)
+    // Search Drive using email keywords with fullText (semantic search)
+    console.log('[google/context] searching drive with keywords:', uniqueTopics)
     
-    // If we have keywords, search for them
-    let driveQuery = ''
+    // Search for each keyword individually and merge results
+    const fileMap = new Map<string, any>() // Use Map to deduplicate by file ID
+
     if (uniqueTopics.length > 0) {
-      // Build query with keywords: (keyword1 OR keyword2 OR keyword3)
-      const keywordConditions = uniqueTopics.slice(0, 5).map((k: string) => `name contains '${k}'`).join(' OR ')
-      driveQuery = `(${keywordConditions}) and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions} ${invoiceExclusions}`
-    } else {
-      // Fallback: search by company name if no keywords
-      driveQuery = `name contains '${company}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions} ${invoiceExclusions}`
-    }
-    
-    console.log('[google/context] drive search query:', driveQuery)
-
-    try {
-      const filesRes = await drive.files.list({
-        q: driveQuery,
-        fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
-        pageSize: 20,
-        orderBy: 'modifiedTime desc',
-      })
-      
-      console.log('[google/context] raw drive API response:', JSON.stringify({
-        files_count: filesRes.data.files?.length || 0,
-        files: filesRes.data.files?.map(f => ({ id: f.id, name: f.name, mimeType: f.mimeType })) || [],
-      }))
-      
-      const returnedCount = filesRes.data.files?.length || 0
-      console.log('[google/context] company name search returned:', returnedCount, 'files')
-      if (returnedCount > 0) {
-        console.log('[google/context] company search files:', filesRes.data.files?.map(f => ({ name: f.name, modified: f.modifiedTime })))
+      for (const keyword of uniqueTopics.slice(0, 5)) {
+        try {
+          const keywordQuery = `fullText contains '${keyword}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions} ${invoiceExclusions}`
+          console.log('[google/context] searching for keyword:', keyword)
+          
+          const filesRes = await drive.files.list({
+            q: keywordQuery,
+            fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
+            pageSize: 10,
+            orderBy: 'modifiedTime desc',
+          })
+          
+          const count = filesRes.data.files?.length || 0
+          console.log('[google/context] keyword search for', keyword, 'returned:', count, 'files')
+          
+          // Add to map (deduplicate by ID)
+          filesRes.data.files?.forEach((f: any) => {
+            if (!fileMap.has(f.id!)) {
+              fileMap.set(f.id!, f)
+            }
+          })
+        } catch (e) {
+          console.error('[google/context] keyword search error for', keyword, ':', e instanceof Error ? e.message : String(e))
+        }
       }
-      allFiles = allFiles.concat(filesRes.data.files || [])
-    } catch (e) {
-      console.error('[google/context] company fullText search error:', e instanceof Error ? e.message : String(e))
+    } else {
+      // No keywords extracted - can't search Drive reliably
+      console.log('[google/context] no keywords extracted - skipping drive search')
     }
 
-    if (allFiles.length === 0) {
-      console.log('[google/context] no drive files found for company:', company, '- user will see empty content message')
-    }
-
-    console.log('[google/context] total files after fallback:', allFiles.length)
-
-    // Remove duplicates and sort by modification time (most recent first)
-    const uniqueFiles = Array.from(
-      new Map(allFiles.map(f => [f.id, f])).values()
-    ).sort((a, b) => {
+    // Convert map to array and sort by modification time
+    allFiles = Array.from(fileMap.values()).sort((a, b) => {
       const aTime = new Date(a.modifiedTime || 0).getTime()
       const bTime = new Date(b.modifiedTime || 0).getTime()
       return bTime - aTime
     })
 
-    // CAP AT 3 FILES - ALWAYS RETURN UP TO 3, EVEN IF LOW RELEVANCE
-    driveFiles = uniqueFiles.slice(0, 3).map(f => {
+    console.log('[google/context] total unique files found:', allFiles.length)
+
+    // Cap at top 3 most relevant files (already deduplicated and sorted by recency)
+    driveFiles = allFiles.slice(0, 3).map(f => {
       console.log('[google/context] selected drive file:', { name: f.name, type: f.mimeType, modified: f.modifiedTime })
       return {
         name: f.name || '',
@@ -327,7 +319,7 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
       }
     })
     
-    console.log('[google/context] final drive files:', driveFiles.length)
+    console.log('[google/context] final drive files selected:', driveFiles.length)
   } catch (e) {
     console.error('[google/context] drive error:', e instanceof Error ? e.message : String(e))
   }
