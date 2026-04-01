@@ -5,9 +5,9 @@ import OnboardingModal from '@/components/dashboard/OnboardingModal'
 
 export default async function DashboardPage() {
   const supabase = await createSupabaseServerClient()
-  const { data: { session } } = await supabase.auth.getSession()
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
 
-  if (!session) {
+  if (userError || !user) {
     redirect('/login')
   }
 
@@ -15,7 +15,7 @@ export default async function DashboardPage() {
   const { data: profile } = await supabase
     .from('user_profiles')
     .select('onboarding_completed')
-    .eq('id', session.user.id)
+    .eq('id', user.id)
     .single()
 
   // Show onboarding if: profile doesn't exist OR onboarding_completed is false or null
