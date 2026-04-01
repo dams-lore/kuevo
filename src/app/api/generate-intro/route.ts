@@ -32,7 +32,7 @@ export async function POST(req: Request) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { prospect_name, company, email_context, free_text_context, transcript_analysis } = await req.json()
+  const { prospect_name, company, email_context, email_analysis, free_text_context, transcript_analysis } = await req.json()
 
   // Detect language from email context if provided, otherwise default to English
   const detectedLanguage = email_context ? detectLanguageFromContent(email_context) : 'English'
@@ -42,6 +42,17 @@ export async function POST(req: Request) {
   let freeTextPart = ''
   if (free_text_context) {
     freeTextPart = `\nContext from user:\n${free_text_context}`
+  }
+
+  // Build email analysis context if available
+  let emailAnalysisPart = ''
+  if (email_analysis && (email_analysis.topics?.length > 0 || email_analysis.pain_points?.length > 0)) {
+    emailAnalysisPart = `
+
+EMAIL ANALYSIS:
+- Topics discussed: ${email_analysis.topics?.join(', ') || 'none'}
+- Pain points: ${email_analysis.pain_points?.join(', ') || 'none'}
+- Interests: ${email_analysis.interests?.join(', ') || 'none'}`
   }
 
   // Build transcript context if available
@@ -69,7 +80,7 @@ Line 2: One sentence explaining what's in the page and why it's relevant for the
 Context:
 - Name: ${prospect_name}
 - Company: ${company}
-${email_context ? `- Email context: ${email_context.substring(0, 200)}` : ''}${freeTextPart}${transcriptContext}
+${email_context ? `- Email context: ${email_context.substring(0, 200)}` : ''}${emailAnalysisPart}${freeTextPart}${transcriptContext}
 
 Respond ONLY in ${detectedLanguage}. No greetings, no signature, no extra text. Just 2 lines.`
     }]

@@ -194,8 +194,51 @@ export async function POST(req: Request) {
     console.error('[google/context] gmail list error:', e)
   }
 
-  const uniqueTopics = [...new Set(emailTopics)].slice(0, 5) // Top 5 unique topics
-  console.log('[google/context] extracted topics:', uniqueTopics)
+  // ── Semantic Analysis with Claude ───────────────────────────────────────────
+  // Use Claude to understand the semantic meaning of the emails
+  let emailAnalysis: any = {
+    topics: [],
+    pain_points: [],
+    interests: [],
+    keywords: [],
+  }
+
+  if (emailSummaries.length > 0) {
+    try {
+      const analysisPrompt = `You are analyzing emails between a sales rep and a prospect at ${company}.
+Extract the main topics, needs, pain points, and interests expressed by the prospect.
+Return ONLY a JSON object with this exact structure:
+{ "topics": [...], "pain_points": [...], "interests": [...], "keywords": [...] }
+
+Keep each array to 3-5 items max. Return ONLY JSON, no other text.
+
+Emails:
+${emailSummaries.slice(0, 5).join('\n---\n')}`
+
+      const message = await anthropic.messages.create({
+        model: 'claude-opus-4-5',
+        max_tokens: 500,
+        messages: [{ role: 'user', content: analysisPrompt }],
+      })
+
+      const raw = (message.content[0] as { type: string; text: string }).text.trim()
+      const jsonStr = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
+      emailAnalysis = JSON.parse(jsonStr)
+      console.log('[google/context] semantic analysis:', emailAnalysis)
+    } catch (e) {
+      console.error('[google/context] semantic analysis error:', e)
+      // Fallback: use extracted topics
+      emailAnalysis = {
+        topics: [...new Set(emailTopics)].slice(0, 5),
+        pain_points: [],
+        interests: [],
+        keywords: [...new Set(emailTopics)].slice(0, 5),
+      }
+    }
+  }
+
+  const uniqueTopics = emailAnalysis.keywords || [...new Set(emailTopics)].slice(0, 5)
+  console.log('[google/context] final keywords for drive search:', uniqueTopics)
 
   // ── Drive ────────────────────────────────────────────────────────────────
   const drive = google.drive({ version: 'v3', auth: oauth2Client })
@@ -489,6 +532,7 @@ Respond ONLY with valid JSON, no markdown:
       detected_language: detectedLanguage,
       message: noContentMessage,
       extracted_keywords: uniqueTopics,
+      email_analysis: emailAnalysis,
       debug: {
         emails_found: emailSummaries.length,
         email_topics_extracted: uniqueTopics.length,

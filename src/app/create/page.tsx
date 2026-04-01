@@ -29,7 +29,7 @@ export default function CreatePage() {
   // ─── Part 2: Context
   const [emailContext, setEmailContext] = useState('')
   const [emailsFound, setEmailsFound] = useState(0)
-  const [extractedKeywords, setExtractedKeywords] = useState<string[]>([])
+  const [emailAnalysis, setEmailAnalysis] = useState<any>(null)
   const [freeTextContext, setFreeTextContext] = useState('')
   const [transcriptAdded, setTranscriptAdded] = useState(false)
   const [transcriptAnalysis, setTranscriptAnalysis] = useState<any>(null)
@@ -123,12 +123,12 @@ export default function CreatePage() {
       if (data.email_subjects) {
         setEmailContext(data.email_subjects)
         setEmailsFound(data.debug?.emails_found || 0)
-        setExtractedKeywords(data.extracted_keywords || [])
+        setEmailAnalysis(data.email_analysis || {})
         setDetectedLanguage(data.detected_language || 'English')
-        toast.success(`Found ${data.debug?.emails_found || 0} emails with ${(data.extracted_keywords || []).length} keywords`)
+        toast.success(`Found ${data.debug?.emails_found || 0} emails analyzed`)
       } else {
         setEmailsFound(0)
-        setExtractedKeywords([])
+        setEmailAnalysis(null)
         toast.info('No emails found for this company')
       }
     } catch (e) {
@@ -191,6 +191,7 @@ export default function CreatePage() {
           prospect_name: prospectName,
           company,
           email_context: emailContext,
+          email_analysis: emailAnalysis,
           free_text_context: freeTextContext,
           transcript_analysis: transcriptAnalysis,
         }),
@@ -482,19 +483,7 @@ export default function CreatePage() {
               
               {emailsFound > 0 && (
                 <div className="mb-3">
-                  <p className="text-xs text-green-600 font-medium mb-2">✓ {emailsFound} emails found</p>
-                  {extractedKeywords.length > 0 && (
-                    <div>
-                      <p className="text-xs text-gray-600 font-semibold mb-1">Topics identified:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {extractedKeywords.map((keyword, i) => (
-                          <span key={i} className="px-2 py-1 bg-violet-100 text-violet-700 text-xs rounded-full font-medium">
-                            {keyword}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <p className="text-xs text-green-600 font-medium">✓ {emailsFound} emails analyzed</p>
                 </div>
               )}
               {emailContext && !emailsFound && (
