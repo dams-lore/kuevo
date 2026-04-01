@@ -89,9 +89,10 @@ async function refreshTokenIfNeeded(
 
 export async function POST(req: Request) {
   const supabase = await createSupabaseServerClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const userId = user.id
   const { prospect_name, company } = await req.json()
   if (!prospect_name || !company) {
     return NextResponse.json({ error: 'prospect_name and company are required' }, { status: 400 })
@@ -106,7 +107,7 @@ export async function POST(req: Request) {
   const { data: integration, error: intError } = await supabase
     .from('integrations')
     .select('*')
-    .eq('user_id', session.user.id)
+    .eq('user_id', userId)
     .single()
 
   if (intError || !integration) {
@@ -125,7 +126,7 @@ export async function POST(req: Request) {
 
   // Verify Drive access
   console.log('[google/context] ========== AUTH CHECK ==========')
-  console.log('[google/context] user_id:', session.user.id)
+  console.log('[google/context] user_id:', userId)
   console.log('[google/context] has access_token:', !!integration.access_token)
   console.log('[google/context] has refresh_token:', !!integration.refresh_token)
   console.log('[google/context] prospect_name:', prospect_name)
@@ -133,7 +134,7 @@ export async function POST(req: Request) {
   console.log('[google/context] =====================================')
 
   // Refresh token if needed
-  await refreshTokenIfNeeded(oauth2Client, integration, supabase, session.user.id)
+  await refreshTokenIfNeeded(oauth2Client, integration, supabase, userId)
 
   const domains = guessDomains(company)
   console.log('[google/context] guessed domains:', domains)
@@ -353,9 +354,6 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
   // Fetch from external sources (user-configured blogs/RSS)
   let externalArticles: Array<{ title: string; url: string }> = []
   try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    const userId = user?.id || session.user.id
-    
     console.log('[context] fetching external sources for user:', userId)
     
     const { data: sources, error: sourcesError } = await supabase
