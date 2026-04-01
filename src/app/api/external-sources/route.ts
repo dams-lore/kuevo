@@ -3,16 +3,16 @@ import { createSupabaseServerClient } from '@/lib/supabase-server'
 
 export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient()
-  const { data: { session } } = await supabase.auth.getSession()
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
   
-  if (!session) {
+  if (userError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const { data, error } = await supabase
     .from('external_sources')
     .select('*')
-    .eq('user_id', session.user.id)
+    .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -25,9 +25,10 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const supabase = await createSupabaseServerClient()
-  const { data: { session } } = await supabase.auth.getSession()
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
   
-  if (!session) {
+  if (userError || !user) {
+    console.error('[external-sources POST] auth error:', userError?.message || 'no user')
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -45,13 +46,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
   }
 
-  console.log('[external-sources POST] user_id:', session.user.id, 'body:', body)
-  console.log('[external-sources POST] inserting source for user:', session.user.id, 'source_type:', source_type, 'url:', url)
+  console.log('[external-sources POST] user_id:', user.id, 'body:', body)
+  console.log('[external-sources POST] inserting source for user:', user.id, 'source_type:', source_type, 'url:', url)
 
   const { data, error } = await supabase
     .from('external_sources')
     .insert({
-      user_id: session.user.id,
+      user_id: user.id,
       source_type,
       url,
       title: title || null,
@@ -70,9 +71,9 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   const supabase = await createSupabaseServerClient()
-  const { data: { session } } = await supabase.auth.getSession()
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
   
-  if (!session) {
+  if (userError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -87,7 +88,7 @@ export async function DELETE(req: Request) {
     .from('external_sources')
     .delete()
     .eq('id', sourceId)
-    .eq('user_id', session.user.id)
+    .eq('user_id', user.id)
 
   if (error) {
     console.error('[external-sources] delete error:', error)
