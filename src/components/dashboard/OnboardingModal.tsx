@@ -25,24 +25,7 @@ export default function OnboardingModal({ show }: OnboardingModalProps) {
   }
 
   const handleSkip = async () => {
-    // Mark onboarding as skipped (don't show again)
-    try {
-      const { data: { user } } = await supabaseBrowser.auth.getUser()
-      if (user) {
-        console.log('[onboarding] marking complete for user:', user.id)
-        const { error } = await supabaseBrowser
-          .from('user_profiles')
-          .update({ onboarding_completed: true })
-          .eq('id', user.id)
-        if (error) {
-          console.error('[onboarding] update error:', error.message)
-        } else {
-          console.log('[onboarding] skip success')
-        }
-      }
-    } catch (e) {
-      console.error('[onboarding] skip error:', e)
-    }
+    // Dismisses modal - will reappear only if user creates pages then deletes all
     setIsOpen(false)
   }
 

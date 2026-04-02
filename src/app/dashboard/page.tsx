@@ -11,17 +11,16 @@ export default async function DashboardPage() {
     redirect('/login')
   }
 
-  // Get onboarding status
-  const { data: profile, error: profileError } = await supabase
-    .from('user_profiles')
-    .select('onboarding_completed')
-    .eq('id', user.id)
-    .single()
+  // Check if user has created any pages
+  const { count: pageCount } = await supabase
+    .from('pages')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id)
 
-  console.log('[dashboard] onboarding check - user.id:', user.id, 'profile:', profile, 'error:', profileError?.message)
+  console.log('[dashboard] user has', pageCount, 'pages')
 
-  // Show onboarding if: profile doesn't exist OR onboarding_completed is false
-  const showOnboarding = profile === null || profile?.onboarding_completed === false
+  // Show onboarding only if user has 0 pages (brand new user)
+  const showOnboarding = pageCount === 0
 
   return (
     <>
