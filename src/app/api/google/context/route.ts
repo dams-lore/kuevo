@@ -466,6 +466,9 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
     console.error('[google/context] external sources error:', e)
   }
 
+  // Cap external articles at 2 (Drive already capped at 3)
+  const topExternalArticles = externalArticles.slice(0, 2)
+
   // Combine and sort all content by date (most recent first)
   // Note: Drive files don't have explicit dates from the API response in this version,
   // but we include them for future enhancement. External articles get source_date.
@@ -476,7 +479,7 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
       type: 'drive' as const,
       source_date: undefined // Drive files don't have date in current API response
     })),
-    ...externalArticles.map(a => ({ 
+    ...topExternalArticles.map(a => ({ 
       title: a.title, 
       url: a.url, 
       type: 'external' as const,
@@ -506,10 +509,10 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
 
   // Log content summary before Claude
   console.log('[google/context] ========== CONTENT SUMMARY ==========')
-  console.log('[google/context] drive files:', driveFiles.length)
-  console.log('[google/context] external articles:', externalArticles.length)
+  console.log('[google/context] drive files (max 3):', driveFiles.length)
+  console.log('[google/context] external articles (max 2):', topExternalArticles.length)
   console.log('[google/context] total before sorting:', allContent.length)
-  console.log('[google/context] total after sorting & cap:', topContent.length)
+  console.log('[google/context] total after sorting & cap to 5:', topContent.length)
   console.log('[google/context] email threads analyzed:', emailSummaries.length)
   console.log('[google/context] =====================================')
 
