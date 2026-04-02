@@ -56,6 +56,73 @@ function detectLanguage(emailSummaries: string[]): string {
   return 'English'
 }
 
+// Auto-discover RSS feed URL from a blog URL
+async function discoverRSSFeed(baseUrl: string): Promise<string | null> {
+  const feedPaths = [
+    '/feed.xml',
+    '/feed',
+    '/rss.xml',
+    '/rss',
+    '/blog/feed',
+    '/index.xml',
+  ]
+
+  // Try common feed paths first
+  for (const path of feedPaths) {
+    try {
+      const feedUrl = baseUrl.replace(/\/$/, '') + path
+      const res = await fetch(feedUrl, {
+        method: 'HEAD',
+        signal: AbortSignal.timeout(3000),
+      })
+
+      if (res.ok) {
+        const contentType = res.headers.get('content-type') || ''
+        if (contentType.includes('rss') || contentType.includes('xml')) {
+          console.log('[rss-discovery] found feed at:', feedUrl)
+          return feedUrl
+        }
+      }
+    } catch (e) {
+      // Continue to next path
+    }
+  }
+
+  // If no common paths found, fetch the HTML and look for RSS link
+  try {
+    const res = await fetch(baseUrl, {
+      signal: AbortSignal.timeout(5000),
+      headers: { 'User-Agent': 'Kuevo/1.0' },
+    })
+
+    if (!res.ok) return null
+
+    const html = await res.text()
+
+    // Look for RSS link in HTML head
+    const rssLinkMatch = html.match(
+      /<link[^>]*rel=["']alternate["'][^>]*type=["']application\/rss\+xml["'][^>]*href=["']([^"']+)["']/i
+    )
+
+    if (rssLinkMatch && rssLinkMatch[1]) {
+      let feedUrl = rssLinkMatch[1]
+      // Convert relative URLs to absolute
+      if (feedUrl.startsWith('/')) {
+        const baseUrlObj = new URL(baseUrl)
+        feedUrl = `${baseUrlObj.origin}${feedUrl}`
+      } else if (!feedUrl.startsWith('http')) {
+        feedUrl = baseUrl.replace(/\/$/, '') + '/' + feedUrl
+      }
+      console.log('[rss-discovery] found RSS link in HTML:', feedUrl)
+      return feedUrl
+    }
+  } catch (e) {
+    console.warn('[rss-discovery] failed to fetch or parse HTML:', e instanceof Error ? e.message : String(e))
+  }
+
+  return null
+}
+
 async function refreshTokenIfNeeded(
   oauth2Client: InstanceType<typeof google.auth.OAuth2>,
   integration: { access_token: string; refresh_token: string | null; expires_at: string | null },
@@ -380,12 +447,28 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
         console.log('[external] processing source - type:', source.source_type, 'url:', source.url)
         
         try {
-          const res = await fetch(source.url, { 
+          let feedUrl = source.url
+          
+          // For blog sources, auto-discover RSS feed
+          if (source.source_type === 'blog') {
+            console.log('[external] auto-discovering RSS feed from blog URL')
+            const discoveredFeed = await discoverRSSFeed(source.url)
+            if (discoveredFeed) {
+              feedUrl = discoveredFeed
+              console.log('[external] using discovered feed:', feedUrl)
+            } else {
+              console.log('[external] no RSS feed discovered, skipping source')
+              continue
+            }
+          }
+
+          // Fetch the feed (RSS or discovered)
+          const res = await fetch(feedUrl, { 
             signal: AbortSignal.timeout(5000),
             headers: { 'User-Agent': 'Kuevo/1.0' }
           })
           
-          console.log('[external] fetched url status:', res.status, 'content length:', res.headers.get('content-length'))
+          console.log('[external] fetched feed status:', res.status, 'content length:', res.headers.get('content-length'))
           
           if (!res.ok) {
             console.warn('[external] failed with status:', res.status)
@@ -396,7 +479,7 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
           console.log('[external] response length:', text.length, 'bytes')
           
           // Parse RSS feed for articles only
-          if (source.source_type === 'rss' && text.includes('<item>')) {
+          if (text.includes('<item>')) {
             console.log('[external] parsing RSS feed')
             const itemRegex = /<item>([\s\S]*?)<\/item>/g
             let match
@@ -437,29 +520,9 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
                 console.log('[google/context] extracted RSS article:', title, 'date:', source_date)
               }
             }
-          } else if (source.source_type === 'rss' && text.includes('<urlset>')) {
-            console.log('[external] parsing sitemap')
-            // Parse XML sitemap
-            const locRegex = /<loc>([\s\S]*?)<\/loc>/g
-            let match
-            let sitemapCount = 0
-            while ((match = locRegex.exec(text)) !== null && externalArticles.length < 10) {
-              const url = match[1].trim()
-              
-              // Skip homepage URL
-              if (!url.endsWith('/') || url !== source.url) {
-                const title = new URL(url).pathname.split('/').filter(Boolean).join(' ')
-                if (title && title.length > 3) {
-                  externalArticles.push({ title, url })
-                  sitemapCount++
-                  console.log('[external] extracted sitemap article:', title)
-                }
-              }
-            }
-            console.log('[external] sitemap extracted', sitemapCount, 'articles')
           } else {
-            // Unknown source type or no content found
-            console.log('[external] unsupported or empty source type:', source.source_type, 'has_item:', text.includes('<item>'), 'has_urlset:', text.includes('<urlset>'))
+            // No RSS items found
+            console.log('[external] no RSS items found in feed')
           }
         } catch (e) {
           console.warn('[google/context] failed to fetch from', source.url, ':', e instanceof Error ? e.message : String(e))
