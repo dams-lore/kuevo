@@ -397,7 +397,7 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
           
           // Parse RSS feed for articles only
           if (source.source_type === 'rss' && text.includes('<item>')) {
-            console.log('[external] parsing RSS feed') {
+            console.log('[external] parsing RSS feed')
             const itemRegex = /<item>([\s\S]*?)<\/item>/g
             let match
             while ((match = itemRegex.exec(text)) !== null && externalArticles.length < 10) {
