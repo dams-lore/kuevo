@@ -713,6 +713,12 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
 
   // Cap external articles at 2 (Drive already capped at 3)
   const topExternalArticles = externalArticles.slice(0, 2)
+  
+  console.log('[google/context] external articles before cap:', externalArticles.length)
+  console.log('[google/context] external articles after cap:', topExternalArticles.length)
+  if (topExternalArticles.length > 0) {
+    console.log('[google/context] selected articles:', topExternalArticles.map(a => a.title))
+  }
 
   // Combine and sort all content by date (most recent first)
   // Note: Drive files don't have explicit dates from the API response in this version,
