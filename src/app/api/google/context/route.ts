@@ -371,7 +371,7 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
       console.log('[google/context] found', sources.length, 'configured external sources')
       
       for (const source of sources) {
-        console.log('[google/context] fetching from', source.source_type, ':', source.url)
+        console.log('[google/context] fetching articles from', source.source_type, ':', source.url)
         
         try {
           const res = await fetch(source.url, { 
@@ -379,66 +379,66 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
             headers: { 'User-Agent': 'Kuevo/1.0' }
           })
           
-          console.log('[google/context] fetched source, status:', res.status, 'url:', source.url)
+          console.log('[google/context] fetched source, status:', res.status)
           
           if (!res.ok) {
-            console.warn('[google/context] source returned non-ok status', res.status, ':', source.url)
+            console.warn('[google/context] source returned non-ok status', res.status)
             continue
           }
           
           const text = await res.text()
           
-          // Parse based on source type
-          if (source.source_type === 'rss') {
+          // Parse RSS feed for articles only
+          if (source.source_type === 'rss' && text.includes('<item>')) {
             const itemRegex = /<item>([\s\S]*?)<\/item>/g
             let match
-            while ((match = itemRegex.exec(text)) !== null) {
+            while ((match = itemRegex.exec(text)) !== null && externalArticles.length < 10) {
               const itemContent = match[1]
+              
+              // Extract title
               const titleMatch = /<title[^>]*>([\s\S]*?)<\/title>/.exec(itemContent)
+              const title = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '').trim() : null
+              
+              // Extract URL (try link first, then guid)
+              let url = null
               const linkMatch = /<link[^>]*>([\s\S]*?)<\/link>/.exec(itemContent)
-              
-              if (titleMatch && linkMatch) {
-                const title = titleMatch[1].replace(/<[^>]*>/g, '').trim()
-                const url = linkMatch[1].replace(/<[^>]*>/g, '').trim()
-                
-                if (title && url && externalArticles.length < 10) {
-                  externalArticles.push({ title, url })
-                  console.log('[google/context] extracted RSS article:', title)
+              if (linkMatch) {
+                url = linkMatch[1].replace(/<[^>]*>/g, '').trim()
+              } else {
+                const guidMatch = /<guid[^>]*>([\s\S]*?)<\/guid>/.exec(itemContent)
+                if (guidMatch) {
+                  url = guidMatch[1].replace(/<[^>]*>/g, '').trim()
                 }
               }
+              
+              // Only add if both title and URL exist and URL is not the homepage
+              if (title && url && url.length > 10 && !url.endsWith(source.url.replace(/\/$/, ''))) {
+                externalArticles.push({ title, url })
+                console.log('[google/context] extracted RSS article:', title, 'url:', url)
+              }
             }
-          } else if (source.source_type === 'blog' || source.source_type === 'website') {
-            // Simple HTML link extraction
-            const linkRegex = /<a[^>]*href=["']([^"']+)["'][^>]*>([^<]+)<\/a>/gi
+          } else if (source.source_type === 'rss' && text.includes('<urlset>')) {
+            // Parse XML sitemap
+            const locRegex = /<loc>([\s\S]*?)<\/loc>/g
             let match
-            let count = 0
-            
-            while ((match = linkRegex.exec(text)) !== null && count < 5) {
-              const url = match[1]
-              const title = match[2].trim()
+            while ((match = locRegex.exec(text)) !== null && externalArticles.length < 10) {
+              const url = match[1].trim()
               
-              if (title.length > 5 && title.length < 150 && 
-                  !['home', 'about', 'contact', 'menu', 'nav'].some(w => title.toLowerCase().includes(w))) {
-                
-                let absoluteUrl = url
-                if (url.startsWith('/')) {
-                  const baseUrl = new URL(source.url)
-                  absoluteUrl = `${baseUrl.origin}${url}`
-                } else if (!url.startsWith('http')) {
-                  const baseUrl = new URL(source.url)
-                  absoluteUrl = `${baseUrl.origin}/${url}`
-                }
-                
-                if (externalArticles.length < 10) {
-                  externalArticles.push({ title, url: absoluteUrl })
-                  console.log('[google/context] extracted blog article:', title)
-                  count++
+              // Skip homepage URL
+              if (!url.endsWith('/') || url !== source.url) {
+                const title = new URL(url).pathname.split('/').filter(Boolean).join(' ')
+                if (title && title.length > 3) {
+                  externalArticles.push({ title, url })
+                  console.log('[google/context] extracted sitemap article:', title)
                 }
               }
             }
+          } else {
+            // Unknown source type - skip
+            console.log('[google/context] skipping unsupported source type:', source.source_type)
           }
         } catch (e) {
-          console.warn('[google/context] failed to fetch from', source.url, ':', e)
+          console.warn('[google/context] failed to fetch from', source.url, ':', e instanceof Error ? e.message : String(e))
         }
       }
     }
