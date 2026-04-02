@@ -354,14 +354,20 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
   // Fetch from external sources (user-configured blogs/RSS)
   let externalArticles: Array<{ title: string; url: string; source_date?: string }> = []
   try {
-    console.log('[context] fetching external sources for user:', userId)
+    console.log('[context] external sources query - user_id:', userId, 'type:', typeof userId)
     
     const { data: sources, error: sourcesError } = await supabase
       .from('external_sources')
       .select('*')
       .eq('user_id', userId)
 
-    console.log('[google/context] external_sources query - found:', sources?.length || 0, 'sources, error:', sourcesError?.message || 'none')
+    console.log('[google/context] external_sources result - found:', sources?.length || 0, 'sources')
+    if (sourcesError) {
+      console.error('[google/context] external_sources error:', sourcesError.message, 'code:', sourcesError.code)
+    }
+    if (sources && sources.length > 0) {
+      console.log('[google/context] sources:', JSON.stringify(sources.map(s => ({ id: s.id, user_id: s.user_id, url: s.url }))))
+    }
     
     if (sourcesError) {
       console.error('[google/context] external_sources fetch error:', sourcesError)
