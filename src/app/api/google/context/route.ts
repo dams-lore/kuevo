@@ -352,7 +352,7 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
     : 'No emails found with this company domain.'
 
   // Fetch from external sources (user-configured blogs/RSS)
-  let externalArticles: Array<{ title: string; url: string }> = []
+  let externalArticles: Array<{ title: string; url: string; source_date?: string }> = []
   try {
     console.log('[context] fetching external sources for user:', userId)
     
@@ -411,10 +411,22 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
                 }
               }
               
+              // Extract publish date
+              let source_date: string | undefined
+              const pubDateMatch = /<pubDate[^>]*>([\s\S]*?)<\/pubDate>/.exec(itemContent)
+              if (pubDateMatch) {
+                try {
+                  source_date = new Date(pubDateMatch[1].trim()).toISOString()
+                } catch (e) {
+                  // If date parsing fails, use current date
+                  source_date = undefined
+                }
+              }
+              
               // Only add if both title and URL exist and URL is not the homepage
               if (title && url && url.length > 10 && !url.endsWith(source.url.replace(/\/$/, ''))) {
-                externalArticles.push({ title, url })
-                console.log('[google/context] extracted RSS article:', title, 'url:', url)
+                externalArticles.push({ title, url, source_date })
+                console.log('[google/context] extracted RSS article:', title, 'date:', source_date)
               }
             }
           } else if (source.source_type === 'rss' && text.includes('<urlset>')) {
@@ -448,24 +460,50 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
     console.error('[google/context] external sources error:', e)
   }
 
-  // Cap external sources at 2 articles (Drive already capped at 3)
-  const topExternalArticles = externalArticles.slice(0, 2)
-
-  // Combine Drive files (up to 3) and external articles (up to 2)
+  // Combine and sort all content by date (most recent first)
+  // Note: Drive files don't have explicit dates from the API response in this version,
+  // but we include them for future enhancement. External articles get source_date.
   const allContent = [
-    ...driveFiles.map(f => ({ title: f.name, url: f.webViewLink, type: 'drive' })),
-    ...topExternalArticles.map(a => ({ title: a.title, url: a.url, type: 'external' }))
+    ...driveFiles.map(f => ({ 
+      title: f.name, 
+      url: f.webViewLink, 
+      type: 'drive' as const,
+      source_date: undefined // Drive files don't have date in current API response
+    })),
+    ...externalArticles.map(a => ({ 
+      title: a.title, 
+      url: a.url, 
+      type: 'external' as const,
+      source_date: a.source_date 
+    }))
   ]
 
-  const driveContext = allContent.length > 0
-    ? allContent.map(c => `- ${c.title} (${c.url})`).join('\n')
+  // Sort by date (most recent first), items without dates go to end
+  const sortedContent = allContent.sort((a, b) => {
+    // Items with dates
+    if (a.source_date && b.source_date) {
+      return new Date(b.source_date).getTime() - new Date(a.source_date).getTime()
+    }
+    // Items without dates go to end
+    if (!a.source_date && !b.source_date) return 0
+    if (!a.source_date) return 1
+    if (!b.source_date) return -1
+    return 0
+  })
+
+  // Cap at 5 total items (Drive + external combined)
+  const topContent = sortedContent.slice(0, 5)
+
+  const driveContext = topContent.length > 0
+    ? topContent.map(c => `- ${c.title} (${c.url})`).join('\n')
     : 'No relevant content found. Add links manually or configure your sources in Settings.'
 
   // Log content summary before Claude
   console.log('[google/context] ========== CONTENT SUMMARY ==========')
-  console.log('[google/context] drive files (max 3):', driveFiles.length)
-  console.log('[google/context] external articles (max 2):', topExternalArticles.length)
-  console.log('[google/context] total content sources:', allContent.length)
+  console.log('[google/context] drive files:', driveFiles.length)
+  console.log('[google/context] external articles:', externalArticles.length)
+  console.log('[google/context] total before sorting:', allContent.length)
+  console.log('[google/context] total after sorting & cap:', topContent.length)
   console.log('[google/context] email threads analyzed:', emailSummaries.length)
   console.log('[google/context] =====================================')
 
