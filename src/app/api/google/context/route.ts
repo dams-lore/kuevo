@@ -447,22 +447,67 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
         console.log('[external] processing source - type:', source.source_type, 'url:', source.url)
         
         try {
-          let feedUrl = source.url
+          let feedUrl: string | null = null
+
+          // Step 1: Try common RSS feed paths first
+          const feedPaths = ['/feed.xml', '/feed', '/rss.xml', '/rss', '/blog/feed', '/index.xml']
+          const baseUrl = source.url.replace(/\/$/, '')
           
-          // For blog sources, auto-discover RSS feed
-          if (source.source_type === 'blog') {
-            console.log('[external] auto-discovering RSS feed from blog URL')
-            const discoveredFeed = await discoverRSSFeed(source.url)
-            if (discoveredFeed) {
-              feedUrl = discoveredFeed
-              console.log('[external] using discovered feed:', feedUrl)
-            } else {
-              console.log('[external] no RSS feed discovered, skipping source')
-              continue
+          for (const path of feedPaths) {
+            try {
+              const testUrl = baseUrl + path
+              const headRes = await fetch(testUrl, { 
+                method: 'HEAD',
+                signal: AbortSignal.timeout(2000)
+              })
+              
+              if (headRes.ok) {
+                console.log('[rss-discovery] found feed at:', testUrl)
+                feedUrl = testUrl
+                break
+              }
+            } catch (e) {
+              // Continue to next path
             }
           }
 
-          // Fetch the feed (RSS or discovered)
+          // Step 2: If no common path found, fetch HTML and look for RSS link
+          if (!feedUrl) {
+            try {
+              console.log('[rss-discovery] trying HTML meta tag discovery for:', source.url)
+              const htmlRes = await fetch(source.url, {
+                signal: AbortSignal.timeout(5000),
+                headers: { 'User-Agent': 'Kuevo/1.0' }
+              })
+              
+              if (htmlRes.ok) {
+                const html = await htmlRes.text()
+                const rssMatch = html.match(/<link[^>]*rel=["']alternate["'][^>]*type=["']application\/rss\+xml["'][^>]*href=["']([^"']+)["']/i)
+                
+                if (rssMatch && rssMatch[1]) {
+                  let discoveredUrl = rssMatch[1]
+                  // Convert relative to absolute
+                  if (discoveredUrl.startsWith('/')) {
+                    discoveredUrl = baseUrl + discoveredUrl
+                  } else if (!discoveredUrl.startsWith('http')) {
+                    discoveredUrl = baseUrl + '/' + discoveredUrl
+                  }
+                  console.log('[rss-discovery] found RSS link in HTML:', discoveredUrl)
+                  feedUrl = discoveredUrl
+                }
+              }
+            } catch (e) {
+              console.warn('[rss-discovery] HTML discovery failed:', e instanceof Error ? e.message : String(e))
+            }
+          }
+
+          // Step 3: If still no feed found, skip this source
+          if (!feedUrl) {
+            console.log('[rss-discovery] no RSS feed found for:', source.url)
+            continue
+          }
+
+          // Fetch the discovered RSS feed
           const res = await fetch(feedUrl, { 
             signal: AbortSignal.timeout(5000),
             headers: { 'User-Agent': 'Kuevo/1.0' }
