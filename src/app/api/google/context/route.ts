@@ -5,6 +5,90 @@ import { createSupabaseServerClient } from '@/lib/supabase-server'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
+// File index entry for Claude decision-making
+interface DriveFileIndex {
+  id: string
+  name: string
+  url: string
+  mimeType: string
+  contentSnippet: string // First 500 chars of exported content
+}
+
+// Fetch all files from Drive folders and build content index
+async function buildDriveIndex(
+  drive: any,
+  folderIds: string[]
+): Promise<DriveFileIndex[]> {
+  const index: DriveFileIndex[] = []
+  const allowedMimes = [
+    'application/vnd.google-apps.document',
+    'application/vnd.google-apps.presentation',
+    'application/pdf',
+  ]
+
+  console.log('[drive-index] building index from', folderIds.length, 'folders')
+
+  for (const folderId of folderIds) {
+    try {
+      // Fetch all files in this folder
+      const filesRes = await drive.files.list({
+        q: `'${folderId}' in parents and trashed = false and (${
+          allowedMimes.map(m => `mimeType='${m}'`).join(' or ')
+        })`,
+        fields: 'files(id, name, webViewLink, mimeType, exportLinks)',
+        pageSize: 50,
+      })
+
+      const files = filesRes.data.files || []
+      console.log('[drive-index] found', files.length, 'files in folder', folderId)
+
+      for (const file of files) {
+        try {
+          let contentSnippet = ''
+
+          // Export content as plain text for Docs and Slides
+          if (file.mimeType === 'application/vnd.google-apps.document') {
+            const exportUrl = file.exportLinks?.['text/plain']
+            if (exportUrl) {
+              const res = await fetch(exportUrl, { signal: AbortSignal.timeout(5000) })
+              const text = await res.text()
+              contentSnippet = text.substring(0, 500)
+              console.log('[drive-index] exported doc:', file.name, 'snippet length:', contentSnippet.length)
+            }
+          } else if (file.mimeType === 'application/vnd.google-apps.presentation') {
+            const exportUrl = file.exportLinks?.['text/plain']
+            if (exportUrl) {
+              const res = await fetch(exportUrl, { signal: AbortSignal.timeout(5000) })
+              const text = await res.text()
+              contentSnippet = text.substring(0, 500)
+              console.log('[drive-index] exported slide:', file.name, 'snippet length:', contentSnippet.length)
+            }
+          } else if (file.mimeType === 'application/pdf') {
+            // PDFs can't be easily exported as text, use filename only
+            contentSnippet = file.name
+            console.log('[drive-index] pdf (no content export):', file.name)
+          }
+
+          index.push({
+            id: file.id!,
+            name: file.name!,
+            url: file.webViewLink!,
+            mimeType: file.mimeType!,
+            contentSnippet,
+          })
+        } catch (e) {
+          console.warn('[drive-index] failed to process file', file.name, ':', e instanceof Error ? e.message : String(e))
+        }
+      }
+    } catch (e) {
+      console.error('[drive-index] failed to fetch folder', folderId, ':', e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  console.log('[drive-index] total indexed files:', index.length)
+  return index
+}
+
 // Turn "Acme Corp" → ["acmecorp.com", "acme.com", "acme-corp.com"]
 function guessDomains(company: string): string[] {
   const clean = company.toLowerCase().trim()
@@ -247,111 +331,67 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
   let driveFiles: DriveFile[] = []
 
   try {
-    // Build exclusion filters
-    let exclusions = ''
-    if (exclude_invoices) {
-      exclusions += ' and not name contains "invoice" and not name contains "receipt"'
-    }
-    if (exclude_financial) {
-      exclusions += ' and not name contains "financial" and not name contains "budget" and not name contains "p&l" and not name contains "expense"'
-    }
+    // Get user's selected Drive folders
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('selected_drive_folders')
+      .eq('id', userId)
+      .single()
 
-    let allFiles: any[] = []
+    const selectedFolders = (userProfile?.selected_drive_folders as string[]) || []
+    console.log('[google/context] user has', selectedFolders.length, 'folders configured')
 
-    // Invoice/payroll/contract exclusion keywords (case insensitive via Drive API)
-    const invoiceKeywords = ['facture', 'invoice', 'payroll', 'salary', 'contrat', 'paie', 'bulletin']
-    const invoiceExclusions = invoiceKeywords
-      .map(k => `and not name contains "${k}"`)
-      .join(' ')
+    if (selectedFolders.length > 0) {
+      // Build a comprehensive index of all files with content snippets
+      const fileIndex = await buildDriveIndex(drive, selectedFolders)
 
-    // Search Drive using email keywords with fullText (semantic search)
-    console.log('[google/context] searching drive with keywords:', uniqueTopics)
-    
-    // Search for each keyword individually and merge results
-    const fileMap = new Map<string, any>() // Use Map to deduplicate by file ID
+      if (fileIndex.length > 0 && emailAnalysis.keywords.length > 0) {
+        // Ask Claude to select the top 3 most relevant files based on keywords and content
+        const indexPrompt = `You are helping find the most relevant documents for a sales follow-up.
+The user's interests/keywords are: ${emailAnalysis.keywords.slice(0, 5).join(', ')}
 
-    if (uniqueTopics.length > 0) {
-      for (const keyword of uniqueTopics.slice(0, 5)) {
+Available files in their Drive:
+${fileIndex.map((f, i) => `${i + 1}. "${f.name}" (ID: ${f.id})\n   Preview: ${f.contentSnippet}`).join('\n\n')}
+
+Based on the keywords and file content, which 3 files are most relevant? Return ONLY a JSON array of file IDs:
+["id1", "id2", "id3"]
+`
         try {
-          const keywordQuery = `fullText contains '${keyword}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions} ${invoiceExclusions}`
-          console.log('[drive] search query:', keywordQuery)
-          
-          try {
-            const filesRes = await drive.files.list({
-              q: keywordQuery,
-              fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
-              pageSize: 10,
-              orderBy: 'modifiedTime desc',
-            })
-            
-            const count = filesRes.data.files?.length || 0
-            console.log('[drive] results:', count, 'files for keyword:', keyword)
-            if (count === 0) {
-              console.log('[drive] no results - trying simpler query with name contains instead')
-              // Fallback: try simpler name contains query
-              const simpleQuery = `name contains '${keyword}' and trashed = false and (mimeType="application/vnd.google-apps.document" OR mimeType="application/vnd.google-apps.presentation" OR mimeType="application/pdf")${exclusions}`
-              console.log('[drive] fallback query:', simpleQuery)
-              const simpleRes = await drive.files.list({
-                q: simpleQuery,
-                fields: 'files(id, name, webViewLink, mimeType, modifiedTime)',
-                pageSize: 10,
-              })
-              const simpleCount = simpleRes.data.files?.length || 0
-              console.log('[drive] fallback results:', simpleCount, 'files')
-              simpleRes.data.files?.forEach((f: any) => {
-                if (!fileMap.has(f.id!)) {
-                  fileMap.set(f.id!, f)
-                }
-              })
-            }
-            
-            filesRes.data.files?.forEach((f: any) => {
-              if (!fileMap.has(f.id!)) {
-                fileMap.set(f.id!, f)
-              }
-            })
-          } catch (driveError) {
-            console.error('[drive] API error for keyword', keyword, ':', driveError instanceof Error ? driveError.message : String(driveError))
-          }
+          const message = await anthropic.messages.create({
+            model: 'claude-opus-4-5',
+            max_tokens: 100,
+            messages: [{ role: 'user', content: indexPrompt }],
+          })
+
+          const raw = (message.content[0] as { type: string; text: string }).text.trim()
+          const jsonStr = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
+          const selectedIds: string[] = JSON.parse(jsonStr)
+
+          console.log('[google/context] claude selected file ids:', selectedIds)
+
+          // Map selected IDs back to file objects
+          driveFiles = selectedIds
+            .map(id => fileIndex.find(f => f.id === id))
+            .filter((f): f is DriveFileIndex => f !== undefined)
+            .map(f => ({
+              name: f.name,
+              webViewLink: f.url,
+              mimeType: f.mimeType,
+            }))
+
+          console.log('[google/context] final drive files:', driveFiles.length)
         } catch (e) {
-          console.error('[google/context] keyword search error for', keyword, ':', e instanceof Error ? e.message : String(e))
+          console.error('[google/context] claude selection error:', e instanceof Error ? e.message : String(e))
         }
       }
     } else {
-      // No keywords extracted - can't search Drive reliably
-      console.log('[google/context] no keywords extracted - skipping drive search')
+      console.log('[google/context] user has no folders configured - skipping drive search')
     }
-
-    // Convert map to array and sort by modification time
-    allFiles = Array.from(fileMap.values()).sort((a, b) => {
-      const aTime = new Date(a.modifiedTime || 0).getTime()
-      const bTime = new Date(b.modifiedTime || 0).getTime()
-      return bTime - aTime
-    })
-
-    console.log('[google/context] total unique files found:', allFiles.length)
-
-    // Cap at top 3 most relevant files (already deduplicated and sorted by recency)
-    driveFiles = allFiles.slice(0, 3).map(f => {
-      console.log('[google/context] selected drive file:', { name: f.name, type: f.mimeType, modified: f.modifiedTime })
-      return {
-        name: f.name || '',
-        webViewLink: f.webViewLink || '',
-        mimeType: f.mimeType || '',
-      }
-    })
-    
-    console.log('[google/context] final drive files selected:', driveFiles.length)
-  } catch (e) {
-    console.error('[google/context] drive error:', e instanceof Error ? e.message : String(e))
+    } catch (e) {
+    console.error('[google/context] external sources error:', e)
   }
 
-  // ── Claude ────────────────────────────────────────────────────────────────
-  const emailContext = emailSummaries.length > 0
-    ? emailSummaries.join('\n\n---\n\n')
-    : 'No emails found with this company domain.'
-
-  // Fetch from external sources (user-configured blogs/RSS)
+  // Fetch external sources
   let externalArticles: Array<{ title: string; url: string }> = []
   try {
     console.log('[context] fetching external sources for user:', userId)
