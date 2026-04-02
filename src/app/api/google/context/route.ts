@@ -56,6 +56,51 @@ function detectLanguage(emailSummaries: string[]): string {
   return 'English'
 }
 
+// Extract article links from blog/resources HTML page
+async function extractArticlesFromHTML(pageUrl: string): Promise<Array<{ title: string; url: string }>> {
+  const articles: Array<{ title: string; url: string }> = []
+  
+  try {
+    console.log('[html-extract] fetching page:', pageUrl)
+    const res = await fetch(pageUrl, {
+      signal: AbortSignal.timeout(5000),
+      headers: { 'User-Agent': 'Kuevo/1.0' }
+    })
+    
+    if (!res.ok) return articles
+    
+    const html = await res.text()
+    
+    // Find all links that contain /blog/ or /ressources/ or /resources/
+    const linkRegex = /<a[^>]*href=["']([^"']*(?:\/blog\/|\/ressources\/|\/resources\/)[^"']*)["'][^>]*>([^<]+)<\/a>/gi
+    let match
+    
+    while ((match = linkRegex.exec(html)) !== null && articles.length < 3) {
+      let url = match[1].trim()
+      const text = match[2].trim()
+      
+      // Skip if too short or looks like navigation
+      if (text.length < 5 || text.length > 100) continue
+      if (text.toLowerCase().includes('more') || text.toLowerCase().includes('read')) continue
+      
+      // Convert relative URLs to absolute
+      if (url.startsWith('/')) {
+        const baseUrlObj = new URL(pageUrl)
+        url = `${baseUrlObj.origin}${url}`
+      } else if (!url.startsWith('http')) {
+        url = pageUrl.replace(/\/$/, '') + '/' + url
+      }
+      
+      articles.push({ title: text, url })
+      console.log('[html-extract] found article:', text)
+    }
+  } catch (e) {
+    console.warn('[html-extract] error:', e instanceof Error ? e.message : String(e))
+  }
+  
+  return articles
+}
+
 // Parse sitemap and extract article URLs
 async function parseSitemap(baseUrl: string): Promise<Array<{ title: string; url: string }>> {
   const articles: Array<{ title: string; url: string }> = []
@@ -564,9 +609,21 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
             }
           }
 
-          // Step 3: If still no feed found, skip this source
+          // Step 3: If still no feed found, try extracting from HTML
           if (!feedUrl) {
-            console.log('[rss-discovery] no RSS feed found for:', source.url)
+            console.log('[rss-discovery] no RSS feed found, trying HTML extraction')
+            const htmlArticles = await extractArticlesFromHTML(source.url)
+            
+            if (htmlArticles.length > 0) {
+              console.log('[html-extract] found', htmlArticles.length, 'articles from HTML')
+              htmlArticles.slice(0, 2).forEach(article => {
+                externalArticles.push({ title: article.title, url: article.url })
+                console.log('[external] added HTML article:', article.title)
+              })
+              continue
+            }
+            
+            console.log('[rss-discovery] no RSS feed and no articles found for:', source.url)
             continue
           }
 
