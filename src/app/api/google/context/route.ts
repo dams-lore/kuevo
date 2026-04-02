@@ -377,7 +377,7 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
       console.log('[google/context] found', sources.length, 'configured external sources')
       
       for (const source of sources) {
-        console.log('[google/context] fetching articles from', source.source_type, ':', source.url)
+        console.log('[external] processing source - type:', source.source_type, 'url:', source.url)
         
         try {
           const res = await fetch(source.url, { 
@@ -385,17 +385,19 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
             headers: { 'User-Agent': 'Kuevo/1.0' }
           })
           
-          console.log('[google/context] fetched source, status:', res.status)
+          console.log('[external] fetched url status:', res.status, 'content length:', res.headers.get('content-length'))
           
           if (!res.ok) {
-            console.warn('[google/context] source returned non-ok status', res.status)
+            console.warn('[external] failed with status:', res.status)
             continue
           }
           
           const text = await res.text()
+          console.log('[external] response length:', text.length, 'bytes')
           
           // Parse RSS feed for articles only
           if (source.source_type === 'rss' && text.includes('<item>')) {
+            console.log('[external] parsing RSS feed') {
             const itemRegex = /<item>([\s\S]*?)<\/item>/g
             let match
             while ((match = itemRegex.exec(text)) !== null && externalArticles.length < 10) {
@@ -436,9 +438,11 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
               }
             }
           } else if (source.source_type === 'rss' && text.includes('<urlset>')) {
+            console.log('[external] parsing sitemap')
             // Parse XML sitemap
             const locRegex = /<loc>([\s\S]*?)<\/loc>/g
             let match
+            let sitemapCount = 0
             while ((match = locRegex.exec(text)) !== null && externalArticles.length < 10) {
               const url = match[1].trim()
               
@@ -447,13 +451,15 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
                 const title = new URL(url).pathname.split('/').filter(Boolean).join(' ')
                 if (title && title.length > 3) {
                   externalArticles.push({ title, url })
-                  console.log('[google/context] extracted sitemap article:', title)
+                  sitemapCount++
+                  console.log('[external] extracted sitemap article:', title)
                 }
               }
             }
+            console.log('[external] sitemap extracted', sitemapCount, 'articles')
           } else {
-            // Unknown source type - skip
-            console.log('[google/context] skipping unsupported source type:', source.source_type)
+            // Unknown source type or no content found
+            console.log('[external] unsupported or empty source type:', source.source_type, 'has_item:', text.includes('<item>'), 'has_urlset:', text.includes('<urlset>'))
           }
         } catch (e) {
           console.warn('[google/context] failed to fetch from', source.url, ':', e instanceof Error ? e.message : String(e))
