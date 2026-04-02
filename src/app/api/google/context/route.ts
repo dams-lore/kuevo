@@ -497,8 +497,24 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
           let feedUrl: string | null = null
 
           // Step 1: Try common RSS feed paths first
-          const feedPaths = ['/feed.xml', '/feed', '/rss.xml', '/rss', '/blog/feed', '/index.xml']
+          let feedPaths = ['/feed.xml', '/feed', '/rss.xml', '/rss', '/blog/feed', '/index.xml']
           const baseUrl = source.url.replace(/\/$/, '')
+          
+          // For Highspot French blog, also try English feed paths
+          if (source.url.includes('highspot.com') && source.url.includes('/fr/')) {
+            feedPaths = [
+              '/feed.xml',
+              '/feed',
+              '/rss.xml',
+              '/rss',
+              '/blog/feed',
+              '/index.xml',
+              '/en/feed.xml',
+              '/en/feed',
+              '/en/blog/feed'
+            ]
+            console.log('[rss-discovery] Highspot French blog detected, trying English paths too')
+          }
           
           for (const path of feedPaths) {
             try {
