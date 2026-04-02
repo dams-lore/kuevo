@@ -516,117 +516,43 @@ export default function Home() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-slate-900 mb-4">
-              Simple, transparent pricing
+              Simple pricing. No surprises.
             </h2>
-            <p className="text-lg text-slate-500">
-              Choose the plan that fits your sales workflow
+            <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+              Whether you're an AE or an entire sales team, you won't break the bank.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 mb-16">
-            {/* Starter Plan */}
-            <div className="bg-white border border-slate-200 rounded-3xl p-8 hover:shadow-lg transition">
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Starter</h3>
-              <div className="mb-6">
-                <span className="text-4xl font-bold text-slate-900">€25</span>
+          <div className="grid md:grid-cols-2 gap-8 mb-16 max-w-2xl mx-auto">
+            {/* User Plan */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-10 hover:shadow-lg transition">
+              <h3 className="text-2xl font-bold text-slate-900 mb-2">User</h3>
+              <div className="mb-8">
+                <span className="text-5xl font-bold text-slate-900">€25</span>
                 <span className="text-slate-500 ml-2">/month</span>
               </div>
-              <p className="text-slate-600 font-semibold mb-6">5 links/month</p>
-              <button
-                onClick={() => formRef.current?.scrollIntoView({ behavior: 'smooth' })}
-                className="w-full px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-900 font-semibold rounded-lg transition mb-8"
+              <p className="text-slate-600 font-semibold mb-8">Unlimited links. That's it.</p>
+              <a
+                href="/auth/signup"
+                className="w-full px-4 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-semibold rounded-lg transition inline-block text-center"
               >
-                Get early access
-              </button>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center gap-3">
-                  <IconCheck />
-                  <span className="text-slate-700">5 branded pages/month</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <IconCheck />
-                  <span className="text-slate-700">Basic engagement tracking</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <IconCheck />
-                  <span className="text-slate-700">Email integration</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <IconCheck />
-                  <span className="text-slate-700">Community support</span>
-                </div>
-              </div>
+                Start for free
+              </a>
             </div>
 
-            {/* Pro Plan (Most Popular) */}
-            <div className="bg-white border-2 border-violet-600 rounded-3xl p-8 hover:shadow-lg transition relative">
-              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-violet-600 text-white px-4 py-1 rounded-full text-sm font-semibold">
-                Most popular
+            {/* Teams Plan */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-10 hover:shadow-lg transition">
+              <h3 className="text-2xl font-bold text-slate-900 mb-2">Teams (3+)</h3>
+              <div className="mb-8">
+                <span className="text-5xl font-bold text-slate-900">Custom</span>
               </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Pro</h3>
-              <div className="mb-6">
-                <span className="text-4xl font-bold text-slate-900">€40</span>
-                <span className="text-slate-500 ml-2">/month</span>
-              </div>
-              <p className="text-slate-600 font-semibold mb-6">Unlimited links + AI</p>
-              <button
-                onClick={() => formRef.current?.scrollIntoView({ behavior: 'smooth' })}
-                className="w-full px-4 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-semibold rounded-lg transition mb-8"
+              <p className="text-slate-600 font-semibold mb-8">Custom pricing for your needs</p>
+              <a
+                href="mailto:sales@kuevo.io"
+                className="w-full px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-900 font-semibold rounded-lg transition inline-block text-center"
               >
-                Get early access
-              </button>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center gap-3">
-                  <IconCheck />
-                  <span className="text-slate-700">Unlimited pages</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <IconCheck />
-                  <span className="text-slate-700">AI-powered intros</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <IconCheck />
-                  <span className="text-slate-700">Advanced engagement scoring</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <IconCheck />
-                  <span className="text-slate-700">Priority support</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Team Plan */}
-            <div className="bg-white border border-slate-200 rounded-3xl p-8 hover:shadow-lg transition">
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Team</h3>
-              <div className="mb-6">
-                <span className="text-4xl font-bold text-slate-900">€35</span>
-                <span className="text-slate-500 ml-2">/user/month (min 3)</span>
-              </div>
-              <p className="text-slate-600 font-semibold mb-6">Everything in Pro + manager dashboard</p>
-              <button
-                onClick={() => formRef.current?.scrollIntoView({ behavior: 'smooth' })}
-                className="w-full px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-900 font-semibold rounded-lg transition mb-8"
-              >
-                Get early access
-              </button>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center gap-3">
-                  <IconCheck />
-                  <span className="text-slate-700">All Pro features</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <IconCheck />
-                  <span className="text-slate-700">Team manager dashboard</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <IconCheck />
-                  <span className="text-slate-700">Performance analytics</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <IconCheck />
-                  <span className="text-slate-700">Dedicated support</span>
-                </div>
-              </div>
+                Talk to sales
+              </a>
             </div>
           </div>
 
