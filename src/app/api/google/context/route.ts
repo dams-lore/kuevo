@@ -448,21 +448,24 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
     console.error('[google/context] external sources error:', e)
   }
 
-  // Combine Drive files and external articles
+  // Cap external sources at 2 articles (Drive already capped at 3)
+  const topExternalArticles = externalArticles.slice(0, 2)
+
+  // Combine Drive files (up to 3) and external articles (up to 2)
   const allContent = [
     ...driveFiles.map(f => ({ title: f.name, url: f.webViewLink, type: 'drive' })),
-    ...externalArticles.map(a => ({ title: a.title, url: a.url, type: 'external' }))
+    ...topExternalArticles.map(a => ({ title: a.title, url: a.url, type: 'external' }))
   ]
 
   const driveContext = allContent.length > 0
     ? allContent.map(c => `- ${c.title} (${c.url})`).join('\n')
-    : 'No relevant content found.'
+    : 'No relevant content found. Add links manually or configure your sources in Settings.'
 
   // Log content summary before Claude
   console.log('[google/context] ========== CONTENT SUMMARY ==========')
-  console.log('[google/context] drive files found:', driveFiles.length)
-  console.log('[google/context] external articles found:', externalArticles.length)
-  console.log('[google/context] total content sources:', driveFiles.length + externalArticles.length)
+  console.log('[google/context] drive files (max 3):', driveFiles.length)
+  console.log('[google/context] external articles (max 2):', topExternalArticles.length)
+  console.log('[google/context] total content sources:', allContent.length)
   console.log('[google/context] email threads analyzed:', emailSummaries.length)
   console.log('[google/context] =====================================')
 
