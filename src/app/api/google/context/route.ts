@@ -123,6 +123,54 @@ async function discoverRSSFeed(baseUrl: string): Promise<string | null> {
   return null
 }
 
+// Parse sitemap and extract article URLs
+async function parseSitemap(baseUrl: string): Promise<Array<{ title: string; url: string }>> {
+  const articles: Array<{ title: string; url: string }> = []
+  
+  try {
+    const sitemapUrl = baseUrl.replace(/\/$/, '') + '/sitemap.xml'
+    console.log('[sitemap] trying:', sitemapUrl)
+    
+    const res = await fetch(sitemapUrl, {
+      signal: AbortSignal.timeout(5000),
+      headers: { 'User-Agent': 'Kuevo/1.0' }
+    })
+    
+    if (!res.ok) {
+      console.log('[sitemap] not found (status:', res.status + ')')
+      return articles
+    }
+    
+    const text = await res.text()
+    const locRegex = /<loc>([\s\S]*?)<\/loc>/g
+    let match
+    let count = 0
+    
+    while ((match = locRegex.exec(text)) !== null && count < 2) {
+      const url = match[1].trim()
+      
+      // Only include blog/resource URLs, skip homepage
+      if ((url.includes('/blog/') || url.includes('/ressources/') || url.includes('/resources/')) && 
+          !url.endsWith('/')) {
+        const title = new URL(url).pathname.split('/').filter(Boolean).pop() || 'Article'
+        articles.push({ title, url })
+        count++
+        console.log('[sitemap] extracted:', title)
+      }
+    }
+    
+    if (articles.length > 0) {
+      console.log('[sitemap] found', articles.length, 'articles')
+    } else {
+      console.log('[sitemap] no blog/resource articles found')
+    }
+  } catch (e) {
+    console.warn('[sitemap] error:', e instanceof Error ? e.message : String(e))
+  }
+  
+  return articles
+}
+
 async function refreshTokenIfNeeded(
   oauth2Client: InstanceType<typeof google.auth.OAuth2>,
   integration: { access_token: string; refresh_token: string | null; expires_at: string | null },
@@ -566,8 +614,17 @@ ${emailSummaries.slice(0, 5).join('\n---\n')}`
               }
             }
           } else {
-            // No RSS items found
-            console.log('[external] no RSS items found in feed')
+            // No RSS items found - try sitemap as fallback
+            console.log('[external] no RSS items found, trying sitemap fallback')
+            const sitemapArticles = await parseSitemap(source.url)
+            
+            if (sitemapArticles.length > 0) {
+              console.log('[external] found', sitemapArticles.length, 'articles from sitemap')
+              sitemapArticles.forEach(article => {
+                externalArticles.push({ title: article.title, url: article.url })
+                console.log('[external] added sitemap article:', article.title)
+              })
+            }
           }
         } catch (e) {
           console.warn('[google/context] failed to fetch from', source.url, ':', e instanceof Error ? e.message : String(e))
