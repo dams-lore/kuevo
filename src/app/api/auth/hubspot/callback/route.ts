@@ -3,9 +3,9 @@ import { createSupabaseServerClient } from '@/lib/supabase-server'
 
 export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient()
-  const { data: { session } } = await supabase.auth.getSession()
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
 
-  if (!session) {
+  if (userError || !user) {
     return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'https://kuevo.io'}/login`)
   }
 
@@ -43,7 +43,7 @@ export async function GET(req: Request) {
     const { error } = await supabase
       .from('integrations')
       .upsert({
-        user_id: session.user.id,
+        user_id: user.id,
         provider: 'hubspot',
         access_token,
         refresh_token: refresh_token || null,
@@ -57,7 +57,7 @@ export async function GET(req: Request) {
       throw error
     }
 
-    console.log('[hubspot/callback] successfully stored HubSpot token for user:', session.user.id)
+    console.log('[hubspot/callback] successfully stored HubSpot token for user:', user.id)
 
     // Redirect to settings page
     return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || 'https://kuevo.io'}/settings?hubspot_connected=true`)
