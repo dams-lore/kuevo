@@ -15,6 +15,7 @@ interface KuevoPage {
   prospect_name: string
   company: string
   intro_message: string | null
+  hubspot_contact_id: string | null
   page_blocks: PageBlock[]
 }
 
@@ -31,7 +32,7 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
 
   const { data: page, error } = await supabaseAdmin
     .from('pages')
-    .select('id, prospect_name, company, intro_message, page_blocks(id, title, url, position)')
+    .select('id, prospect_name, company, intro_message, hubspot_contact_id, page_blocks(id, title, url, position)')
     .eq('slug', slug)
     .single() as { data: KuevoPage | null; error: unknown }
 
@@ -43,7 +44,7 @@ export default async function PublicPage({ params }: { params: Promise<{ slug: s
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-950 via-indigo-900 to-slate-900">
-      <PageTracker pageId={page.id} />
+      <PageTracker pageId={page.id} hubspotContactId={page.hubspot_contact_id || undefined} pageName={page.prospect_name} />
 
       {/* Header */}
       <header className="px-6 py-5 flex items-center">
