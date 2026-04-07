@@ -23,9 +23,9 @@ export async function GET(req: Request) {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
-        client_id: process.env.NEXT_PUBLIC_HUBSPOT_CLIENT_ID || '',
+        client_id: process.env.HUBSPOT_CLIENT_ID || '',
         client_secret: process.env.HUBSPOT_CLIENT_SECRET || '',
-        redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL || 'https://kuevo.io'}/api/auth/hubspot/callback`,
+        redirect_uri: process.env.HUBSPOT_REDIRECT_URI || `${process.env.NEXT_PUBLIC_APP_URL || 'https://kuevo.io'}/api/auth/hubspot/callback`,
         code,
       }).toString(),
     })
