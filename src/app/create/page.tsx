@@ -447,6 +447,44 @@ export default function CreatePage() {
           <h2 className="text-xl font-bold text-gray-900 mb-6">Contact info</h2>
 
           <div className="space-y-4">
+            {/* HubSpot Contact Search */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Search HubSpot Contact</label>
+              <div className="relative">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    onChange={(e) => handleHubspotSearch(e.target.value)}
+                    placeholder="Search by name or email..."
+                    className="flex-1 px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
+                    onFocus={() => hubspotContacts.length > 0 && setShowHubspotDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowHubspotDropdown(false), 200)}
+                  />
+                  {searchingHubspot && <span className="text-sm text-gray-500 py-2.5">Searching...</span>}
+                </div>
+                {showHubspotDropdown && hubspotContacts.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-2 z-20 max-h-48 overflow-y-auto">
+                    {hubspotContacts.map((contact, i) => (
+                      <button
+                        key={i}
+                        onClick={() => selectHubspotContact(contact)}
+                        className={`w-full text-left px-4 py-2.5 hover:bg-violet-50 text-sm border-b border-gray-100 last:border-b-0 transition ${
+                          hubspotContactId === contact.id ? 'bg-violet-100' : ''
+                        }`}
+                      >
+                        <div className="font-medium">{contact.firstName} {contact.lastName}</div>
+                        <div className="text-xs text-gray-500">{contact.email}</div>
+                        {contact.company && <div className="text-xs text-gray-400">{contact.company}</div>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {hubspotContactId && (
+                <p className="text-xs text-green-600 mt-2">✓ HubSpot contact selected</p>
+              )}
+            </div>
+
             {/* Contact Name with Autocomplete */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Contact name</label>
