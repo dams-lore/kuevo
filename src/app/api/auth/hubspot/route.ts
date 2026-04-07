@@ -25,7 +25,9 @@ export async function GET() {
   authUrl.searchParams.append('redirect_uri', redirectUri)
   authUrl.searchParams.append('scope', scopes.join(' '))
 
-  console.log('[hubspot/auth] redirecting to:', authUrl.toString().substring(0, 100) + '...')
+  const fullUrl = authUrl.toString()
+  console.log('[hubspot/auth] full authorize URL:', fullUrl)
+  console.log('[hubspot/auth] region: EU (app-eu1.hubspot.com)')
 
   return NextResponse.redirect(authUrl.toString())
 }
