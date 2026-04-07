@@ -13,9 +13,9 @@ export async function POST(req: Request) {
 
     console.log('[api/pages] creating page for user:', session.user.id)
     const body = await req.json()
-    const { prospect_name, company, prospect_email, intro_message, blocks } = body
-    
-    console.log('[api/pages] request body:', { prospect_name, company, prospect_email, intro_message, blocks: blocks?.length || 0 })
+    const { prospect_name, company, prospect_email, intro_message, blocks, hubspot_contact_id } = body
+
+    console.log('[api/pages] request body:', { prospect_name, company, prospect_email, intro_message, blocks: blocks?.length || 0, hubspot_contact_id })
 
     if (!prospect_name || !company) {
       console.error('[api/pages] missing required fields: prospect_name or company')
@@ -27,13 +27,14 @@ export async function POST(req: Request) {
 
     const { data: page, error: pageError } = await supabase
       .from('pages')
-      .insert({ 
-        user_id: session.user.id, 
-        slug, 
-        prospect_name, 
-        company, 
-        prospect_email: prospect_email || null, 
-        intro_message 
+      .insert({
+        user_id: session.user.id,
+        slug,
+        prospect_name,
+        company,
+        prospect_email: prospect_email || null,
+        intro_message,
+        hubspot_contact_id: hubspot_contact_id || null,
       })
       .select()
       .single()

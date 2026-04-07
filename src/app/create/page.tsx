@@ -25,6 +25,12 @@ export default function CreatePage() {
   const [contactEmail, setContactEmail] = useState('')
   const [contactMatches, setContactMatches] = useState<ContactMatch[]>([])
   const [showContactDropdown, setShowContactDropdown] = useState(false)
+  
+  // HubSpot contact search
+  const [hubspotContactId, setHubspotContactId] = useState<string | null>(null)
+  const [hubspotContacts, setHubspotContacts] = useState<any[]>([])
+  const [showHubspotDropdown, setShowHubspotDropdown] = useState(false)
+  const [searchingHubspot, setSearchingHubspot] = useState(false)
 
   // ─── Part 2: Context
   const [emailContext, setEmailContext] = useState('')
@@ -98,6 +104,45 @@ export default function CreatePage() {
     } catch (e) {
       console.error('[create] contact search error:', e)
     }
+  }
+
+  // ─── HubSpot contact search
+  async function handleHubspotSearch(value: string) {
+    if (value.length < 2) {
+      setHubspotContacts([])
+      return
+    }
+
+    setSearchingHubspot(true)
+    try {
+      const res = await fetch('/api/hubspot/contacts/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: value }),
+      })
+
+      if (!res.ok) {
+        console.warn('[create] hubspot search failed:', res.status)
+        setHubspotContacts([])
+      } else {
+        const data = await res.json()
+        setHubspotContacts(data.contacts || [])
+        setShowHubspotDropdown(data.contacts?.length > 0)
+      }
+    } catch (e) {
+      console.error('[create] hubspot search error:', e)
+      setHubspotContacts([])
+    } finally {
+      setSearchingHubspot(false)
+    }
+  }
+
+  function selectHubspotContact(contact: any) {
+    setProspectName(contact.firstName + ' ' + contact.lastName)
+    setCompany(contact.company || '')
+    setContactEmail(contact.email || '')
+    setHubspotContactId(contact.id)
+    setShowHubspotDropdown(false)
   }
 
   // ─── Fetch email context
@@ -288,6 +333,7 @@ export default function CreatePage() {
           prospect_email: contactEmail || undefined,
           intro_message: introMessage,
           blocks,
+          hubspot_contact_id: hubspotContactId || undefined,
         }),
       })
 
