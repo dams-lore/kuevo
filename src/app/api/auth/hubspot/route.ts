@@ -14,7 +14,9 @@ export async function GET() {
     return NextResponse.json({ error: 'HubSpot client ID not configured' }, { status: 500 })
   }
 
-  const authUrl = new URL('https://app.hubapi.com/oauth/authorize')
+  // Use EU region if needed (check HubSpot portal region)
+  // For EU accounts, use https://app-eu1.hubspot.com/oauth/authorize
+  const authUrl = new URL('https://app-eu1.hubspot.com/oauth/authorize')
   authUrl.searchParams.append('client_id', clientId)
   authUrl.searchParams.append('redirect_uri', redirectUri)
   authUrl.searchParams.append('scope', scopes.join(' '))

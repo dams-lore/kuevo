@@ -18,7 +18,8 @@ export async function GET(req: Request) {
     }
 
     // Exchange code for access token
-    const tokenResponse = await fetch('https://api.hubapi.com/oauth/v1/token', {
+    // Use EU region API if needed
+    const tokenResponse = await fetch('https://api-eu1.hubapi.com/oauth/v1/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
