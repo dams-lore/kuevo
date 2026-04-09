@@ -78,7 +78,9 @@ export default function DashboardClient({ showOnboarding = false }: DashboardCli
     const data = await res.json()
     if (data.metrics) {
       setMetrics(data.metrics)
-      setPages(data.pages || [])
+      const pagesData = data.pages || []
+      console.log('[dashboard] loaded pages:', pagesData.map((p: any) => ({ id: p.id, slug: p.slug, name: p.prospect_name })))
+      setPages(pagesData)
     }
     setLoading(false)
   }
